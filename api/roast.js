@@ -96,8 +96,9 @@ Return ONLY valid JSON, no markdown:
     });
 
     if (!claudeResponse.ok) {
-      const errText = await claudeResponse.text(); console.error("Claude error status:", claudeResponse.status, "body:", errText);
-      return res.status(500).json({ error: "Claude couldn't process this image. Try again." });
+      const errText = await claudeResponse.text();
+      console.error("Claude error status:", claudeResponse.status, "body:", errText);
+      return res.status(500).json({ error: `Claude API error ${claudeResponse.status}: ${errText.substring(0, 200)}` });
     }
 
     const claudeData = await claudeResponse.json();
@@ -143,8 +144,9 @@ Style: Messy real handwriting with red sharpie (NOT computer font). Slightly til
     );
 
     if (!geminiResponse.ok) {
-      const gemErrText = await geminiResponse.text(); console.error("Gemini error status:", geminiResponse.status, "body:", gemErrText);
-      return res.status(500).json({ error: "Image generation failed. Try again." });
+      const gemErrText = await geminiResponse.text();
+      console.error("Gemini error status:", geminiResponse.status, "body:", gemErrText);
+      return res.status(500).json({ error: `Gemini API error ${geminiResponse.status}: ${gemErrText.substring(0, 200)}` });
     }
 
     const geminiData = await geminiResponse.json();
