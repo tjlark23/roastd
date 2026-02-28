@@ -63,7 +63,7 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 1024,
         messages: [{
           role: "user",
@@ -96,7 +96,7 @@ Return ONLY valid JSON, no markdown:
     });
 
     if (!claudeResponse.ok) {
-      console.error("Claude error:", await claudeResponse.text());
+      const errText = await claudeResponse.text(); console.error("Claude error status:", claudeResponse.status, "body:", errText);
       return res.status(500).json({ error: "Claude couldn't process this image. Try again." });
     }
 
@@ -143,7 +143,7 @@ Style: Messy real handwriting with red sharpie (NOT computer font). Slightly til
     );
 
     if (!geminiResponse.ok) {
-      console.error("Gemini error:", await geminiResponse.text());
+      const gemErrText = await geminiResponse.text(); console.error("Gemini error status:", geminiResponse.status, "body:", gemErrText);
       return res.status(500).json({ error: "Image generation failed. Try again." });
     }
 
