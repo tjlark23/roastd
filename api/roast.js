@@ -1,6 +1,46 @@
 // api/roast.js — Vercel Serverless Function
-// POST /api/roast
-// Claude Opus 4.6 (analyze + write) → Nano Banana 2 (generate annotated image)
+// Rate limited: 3 free roasts per IP per day
+// Claude Sonnet 4.5 (analyze + write) → Nano Banana 2 (generate annotated image)
+
+const ipUsage = new Map();
+const FREE_LIMIT = 3;
+
+function getClientIP(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+         req.headers['x-real-ip'] || 
+         req.socket?.remoteAddress || 
+         'unknown';
+}
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const entry = ipUsage.get(ip);
+  
+  if (!entry || (now - entry.firstUse) > dayMs) {
+    ipUsage.set(ip, { count: 1, firstUse: now });
+    return { allowed: true, remaining: FREE_LIMIT - 1 };
+  }
+  
+  if (entry.count >= FREE_LIMIT) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: FREE_LIMIT - entry.count };
+}
+
+// Clean old entries every 100 requests
+let requestCount = 0;
+function cleanOldEntries() {
+  requestCount++;
+  if (requestCount % 100 !== 0) return;
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  for (const [ip, entry] of ipUsage) {
+    if ((now - entry.firstUse) > dayMs) ipUsage.delete(ip);
+  }
+}
 
 const CATEGORY_PROMPTS = {
   linkedin: `Analyze this LinkedIn screenshot. Look for: Headline buzzwords, inflated job titles, corporate try-hard photos, humble brags, "open to work" energy. Write 4 brutal roast annotations targeting professional cringe. Mock choices, not appearance.`,
@@ -38,10 +78,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, mimeType, category, style } = req.body;
+    const { image, mimeType, category, style, isPaid } = req.body;
 
     if (!image || !category || !style) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Rate limit check (skip if paid)
+    if (!isPaid) {
+      cleanOldEntries();
+      const ip = getClientIP(req);
+      const limit = checkRateLimit(ip);
+      
+      if (!limit.allowed) {
+        return res.status(429).json({ 
+          error: "free_limit_reached",
+          message: "You've used your 3 free roasts today. Buy more to keep the destruction going.",
+          remaining: 0,
+        });
+      }
+      
+      // Include remaining in successful responses
+      req._remaining = limit.remaining;
     }
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -54,7 +112,7 @@ export default async function handler(req, res) {
     const categoryPrompt = CATEGORY_PROMPTS[category] || CATEGORY_PROMPTS.selfie;
     const stylePrompt = STYLE_PROMPTS[style] || STYLE_PROMPTS.genz;
 
-    // ═══════ STEP 1: Claude Opus 4.6 — Analyze + Write Roast ═══════
+    // ═══════ STEP 1: Claude Sonnet 4.5 — Analyze + Write Roast ═══════
     const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -177,6 +235,7 @@ Style: Messy real handwriting with red sharpie (NOT computer font). Slightly til
       success: true,
       image: `data:${generatedMimeType};base64,${generatedImageBase64}`,
       roastData,
+      remaining: req._remaining ?? null,
     });
   } catch (error) {
     console.error("Roast error:", error);

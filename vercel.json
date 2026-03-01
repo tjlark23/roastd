@@ -1,8 +1,13 @@
 {
-  "buildCommand": "",
-  "outputDirectory": "public",
-  "framework": null,
-  "rewrites": [
-    { "source": "/api/roast", "destination": "/api/roast" }
+  "version": 2,
+  "builds": [
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "api/**/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/roast", "dest": "/api/roast.js" },
+    { "src": "/api/checkout", "dest": "/api/checkout.js" },
+    { "src": "/api/verify", "dest": "/api/verify.js" },
+    { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }

@@ -589,6 +589,125 @@
             .card-name { font-size: 12px; }
             .card-desc { font-size: 9px; }
         }
+
+        /* ─── PAYWALL MODAL ─── */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+        }
+        .modal-box h2 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .modal-box .modal-sub {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+        .pack-options {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .pack-card {
+            flex: 1;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .pack-card:hover {
+            border-color: var(--accent);
+            background: rgba(255, 107, 53, 0.05);
+        }
+        .pack-card.best-value {
+            border-color: var(--accent);
+            position: relative;
+        }
+        .pack-card.best-value::before {
+            content: 'BEST VALUE';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            background: var(--accent);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 2px;
+        }
+        .pack-price {
+            font-family: 'DM Serif Display', serif;
+            font-size: 32px;
+            color: var(--text-primary);
+        }
+        .pack-detail {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .pack-per {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--accent);
+            margin-top: 6px;
+        }
+        .modal-close {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        .modal-close:hover { color: var(--text-secondary); }
+
+        /* ─── CREDITS BADGE ─── */
+        .credits-badge {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .credits-badge .credits-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            display: inline-block;
+        }
+        .credits-badge .credits-dot.low { background: var(--accent); }
+        .credits-badge .credits-dot.empty { background: var(--accent-red); }
+
     </style>
 </head>
 <body>
@@ -658,17 +777,94 @@
     </div>
 
     <script>
+        // ═══════ CREDIT SYSTEM ═══════
+        const CREDITS_KEY = 'roastd_credits';
+        const FREE_USED_KEY = 'roastd_free_used';
+        const FREE_LIMIT = 3;
+        const VERIFIED_SESSIONS_KEY = 'roastd_verified_sessions';
+
+        function getCredits() {
+            return parseInt(localStorage.getItem(CREDITS_KEY) || '0');
+        }
+        function setCredits(n) {
+            localStorage.setItem(CREDITS_KEY, String(Math.max(0, n)));
+        }
+        function getFreeUsed() {
+            const data = JSON.parse(localStorage.getItem(FREE_USED_KEY) || '{}');
+            const today = new Date().toISOString().split('T')[0];
+            if (data.date !== today) return 0;
+            return data.count || 0;
+        }
+        function incrementFreeUsed() {
+            const today = new Date().toISOString().split('T')[0];
+            const data = JSON.parse(localStorage.getItem(FREE_USED_KEY) || '{}');
+            if (data.date !== today) {
+                localStorage.setItem(FREE_USED_KEY, JSON.stringify({ date: today, count: 1 }));
+            } else {
+                data.count = (data.count || 0) + 1;
+                localStorage.setItem(FREE_USED_KEY, JSON.stringify(data));
+            }
+        }
+        function getTotalRemaining() {
+            const freeLeft = Math.max(0, FREE_LIMIT - getFreeUsed());
+            return freeLeft + getCredits();
+        }
+        function useCredit() {
+            const freeLeft = FREE_LIMIT - getFreeUsed();
+            if (freeLeft > 0) {
+                incrementFreeUsed();
+                return true;
+            }
+            if (getCredits() > 0) {
+                setCredits(getCredits() - 1);
+                return true;
+            }
+            return false;
+        }
+        function canRoast() {
+            return getTotalRemaining() > 0;
+        }
+
+        // Handle Stripe redirect
+        async function handleStripeReturn() {
+            const params = new URLSearchParams(window.location.search);
+            const sessionId = params.get('session_id');
+            const credits = parseInt(params.get('credits') || '0');
+            
+            if (sessionId && credits > 0) {
+                const verified = JSON.parse(localStorage.getItem(VERIFIED_SESSIONS_KEY) || '[]');
+                if (!verified.includes(sessionId)) {
+                    try {
+                        const resp = await fetch('/api/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sessionId }),
+                        });
+                        const data = await resp.json();
+                        if (data.valid) {
+                            setCredits(getCredits() + data.credits);
+                            verified.push(sessionId);
+                            localStorage.setItem(VERIFIED_SESSIONS_KEY, JSON.stringify(verified));
+                        }
+                    } catch (e) {
+                        console.error('Verify error:', e);
+                    }
+                }
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+        }
+
         const CATEGORIES = [
             { id: 'linkedin', emoji: '\uD83D\uDCBC', name: 'LinkedIn', desc: 'Your professional delusions' },
             { id: 'twitter', emoji: '\uD83D\uDC26', name: 'Twitter/X', desc: 'Your online personality' },
-            { id: 'dating', emoji: '\uD83D\uDC95', name: 'Dating Profile', desc: "Why you're still single" },
+            { id: 'dating', emoji: '\uD83D\uDC95', name: 'Dating Profile', desc: "Why you\'re still single" },
             { id: 'pet', emoji: '\uD83D\uDC15', name: 'Pet Photo', desc: 'Your pet has opinions' },
             { id: 'selfie', emoji: '\uD83E\uDD33', name: 'Selfie', desc: 'Your need for validation' },
             { id: 'room', emoji: '\uD83C\uDFE0', name: 'Room / Apartment', desc: 'Your life choices on display' },
             { id: 'wedding', emoji: '\uD83D\uDC92', name: 'Wedding Photo', desc: 'Your Pinterest dreams' },
             { id: 'gym', emoji: '\uD83D\uDCAA', name: 'Gym / Fitness', desc: 'We get it, you work out' },
             { id: 'resume', emoji: '\uD83D\uDCC4', name: 'Resume', desc: 'Your professional lies' },
-            { id: 'car', emoji: '\uD83D\uDE97', name: 'Car', desc: "What you're compensating for" },
+            { id: 'car', emoji: '\uD83D\uDE97', name: 'Car', desc: "What you\'re compensating for" },
         ];
 
         const STYLES = [
@@ -700,11 +896,13 @@
         let state = {
             category: null, style: null, image: null, imagePreview: null,
             loading: false, loadingMsg: '', result: null, roastData: null, error: null,
+            showPaywall: false,
         };
 
         function render() {
             const app = document.getElementById('app');
             let html = '';
+            html += renderCreditsBar();
             html += renderCategorySection();
             html += renderStyleSection();
             html += renderUploadSection();
@@ -712,13 +910,30 @@
             if (state.loading) html += renderLoading();
             if (state.result) html += renderResults();
             if (state.error && !state.loading) html += renderError();
+            if (state.showPaywall) html += renderPaywall();
             app.innerHTML = html;
             attachEventListeners();
         }
 
+        function renderCreditsBar() {
+            const remaining = getTotalRemaining();
+            const freeLeft = Math.max(0, FREE_LIMIT - getFreeUsed());
+            const paid = getCredits();
+            const dotClass = remaining === 0 ? 'empty' : remaining <= 1 ? 'low' : '';
+            let label = '';
+            if (paid > 0) {
+                label = `${remaining} roast${remaining !== 1 ? 's' : ''} remaining`;
+            } else if (freeLeft > 0) {
+                label = `${freeLeft} free roast${freeLeft !== 1 ? 's' : ''} remaining today`;
+            } else {
+                label = 'No roasts remaining';
+            }
+            return `<div style="text-align:center;padding:16px 0 0;"><span class="credits-badge"><span class="credits-dot ${dotClass}"></span>${label}</span></div>`;
+        }
+
         function renderCategorySection() {
             return `<section class="selection-section">
-                <div class="section-header"><h2>What are we roasting?</h2><p>Pick what you're uploading</p></div>
+                <div class="section-header"><h2>What are we roasting?</h2><p>Pick what you\'re uploading</p></div>
                 <div class="card-grid">${CATEGORIES.map(c => `
                     <div class="card ${state.category === c.id ? 'selected' : ''}" data-action="select-category" data-id="${c.id}">
                         <span class="card-emoji">${c.emoji}</span>
@@ -730,7 +945,7 @@
         function renderStyleSection() {
             const vis = state.category !== null;
             return `<section class="selection-section ${vis ? 'section-visible' : 'section-hidden'}" id="style-section">
-                <div class="section-header"><h2>Who's roasting you?</h2><p>Choose your destroyer</p></div>
+                <div class="section-header"><h2>Who\'s roasting you?</h2><p>Choose your destroyer</p></div>
                 <div class="card-grid">${STYLES.map(s => `
                     <div class="card ${state.style === s.id ? 'selected' : ''}" data-action="select-style" data-id="${s.id}">
                         <span class="card-emoji">${s.emoji}</span>
@@ -758,6 +973,9 @@
 
         function renderRoastButton() {
             if (!(state.category && state.style && state.image && !state.loading && !state.result)) return '';
+            if (!canRoast()) {
+                return `<div class="roast-btn-wrapper"><button class="roast-btn" data-action="show-paywall">\uD83D\uDD25 BUY ROASTS TO CONTINUE \uD83D\uDD25</button></div>`;
+            }
             return `<div class="roast-btn-wrapper"><button class="roast-btn" data-action="roast">\uD83D\uDD25 ROAST ME \uD83D\uDD25</button></div>`;
         }
 
@@ -771,9 +989,9 @@
         function renderResults() {
             const styleName = STYLES.find(s => s.id === state.style)?.name || '';
             const categoryName = CATEGORIES.find(c => c.id === state.category)?.name || '';
-            const shareText = encodeURIComponent(`I just got roasted by ${styleName} on Roastd.ai \uD83D\uDD25 roastd.ai`);
+            const shareText = encodeURIComponent(`I just got roasted by ${styleName} on Roastd AI \uD83D\uDD25 roastdai.com`);
             return `<section class="results-section">
-                <h2>You've been roasted.</h2>
+                <h2>You\'ve been roasted.</h2>
                 <div class="results-subtitle">${categoryName} roasted by ${styleName}</div>
                 <div class="result-image-wrapper">
                     <img src="${state.result}" alt="Your roast" class="result-image">
@@ -788,7 +1006,7 @@
                     <div class="share-label">Share your roast</div>
                     <div class="share-buttons">
                         <a href="https://twitter.com/intent/tweet?text=${shareText}" target="_blank" class="share-btn">Share on \uD835\uDD4F</a>
-                        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://roastd.ai" target="_blank" class="share-btn">Share on LinkedIn</a>
+                        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://roastdai.com" target="_blank" class="share-btn">Share on LinkedIn</a>
                     </div>
                 </div></section>`;
         }
@@ -796,6 +1014,28 @@
         function renderError() {
             return `<div class="error-box"><p>${state.error}</p>
                 <button class="retry-btn" data-action="roast">Try again</button></div>`;
+        }
+
+        function renderPaywall() {
+            return `<div class="modal-overlay" data-action="close-paywall">
+                <div class="modal-box" onclick="event.stopPropagation()">
+                    <h2>You\'re out of roasts.</h2>
+                    <p class="modal-sub">Your 3 free daily roasts are used up. Get more to keep the destruction going.</p>
+                    <div class="pack-options">
+                        <div class="pack-card" data-action="buy" data-pack="3pack">
+                            <div class="pack-price">$3</div>
+                            <div class="pack-detail">3 roasts</div>
+                            <div class="pack-per">$1.00 each</div>
+                        </div>
+                        <div class="pack-card best-value" data-action="buy" data-pack="10pack">
+                            <div class="pack-price">$7</div>
+                            <div class="pack-detail">10 roasts</div>
+                            <div class="pack-per">$0.70 each</div>
+                        </div>
+                    </div>
+                    <button class="modal-close" data-action="close-paywall">Maybe later</button>
+                </div>
+            </div>`;
         }
 
         function attachEventListeners() {
@@ -832,12 +1072,15 @@
 
             document.querySelectorAll('[data-action="roast"]').forEach(el => el.addEventListener('click', doRoast));
             document.querySelectorAll('[data-action="download"]').forEach(el => el.addEventListener('click', downloadResult));
+            document.querySelectorAll('[data-action="show-paywall"]').forEach(el => el.addEventListener('click', () => { state.showPaywall = true; render(); }));
+            document.querySelectorAll('[data-action="close-paywall"]').forEach(el => el.addEventListener('click', () => { state.showPaywall = false; render(); }));
+            document.querySelectorAll('[data-action="buy"]').forEach(el => el.addEventListener('click', () => buyPack(el.dataset.pack)));
             document.querySelectorAll('[data-action="try-style"]').forEach(el => el.addEventListener('click', () => {
                 state.style = null; state.result = null; state.roastData = null; state.error = null;
                 render(); document.getElementById('style-section')?.scrollIntoView({ behavior: 'smooth' });
             }));
             document.querySelectorAll('[data-action="start-over"]').forEach(el => el.addEventListener('click', () => {
-                state = { category: null, style: null, image: null, imagePreview: null, loading: false, loadingMsg: '', result: null, roastData: null, error: null };
+                state = { category: null, style: null, image: null, imagePreview: null, loading: false, loadingMsg: '', result: null, roastData: null, error: null, showPaywall: false };
                 render(); window.scrollTo({ top: 0, behavior: 'smooth' });
             }));
         }
@@ -863,24 +1106,64 @@
 
         async function doRoast() {
             if (!state.category || !state.style || !state.image) return;
+            
+            if (!canRoast()) {
+                state.showPaywall = true;
+                render();
+                return;
+            }
+
             state.loading = true; state.result = null; state.error = null;
             startLoadingMessages(); render();
             try {
                 const base64 = await fileToBase64(state.image);
                 const mimeType = state.image.type || 'image/png';
+                const freeLeft = FREE_LIMIT - getFreeUsed();
+                const isPaid = freeLeft <= 0 && getCredits() > 0;
+                
                 const response = await fetch('/api/roast', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64, mimeType, category: state.category, style: state.style }),
+                    body: JSON.stringify({ image: base64, mimeType, category: state.category, style: state.style, isPaid }),
                 });
                 const data = await response.json();
-                if (!response.ok || !data.success) throw new Error(data.error || "Roast failed. Even AI couldn't handle you.");
+                
+                if (data.error === 'free_limit_reached') {
+                    state.loading = false;
+                    state.showPaywall = true;
+                    stopLoadingMessages(); render();
+                    return;
+                }
+                
+                if (!response.ok || !data.success) throw new Error(data.error || "Roast failed. Even AI couldn\'t handle you.");
+                
+                // Deduct credit
+                useCredit();
+                
                 state.result = data.image; state.roastData = data.roastData;
                 state.loading = false; stopLoadingMessages(); render();
                 setTimeout(() => document.querySelector('.results-section')?.scrollIntoView({ behavior: 'smooth' }), 100);
             } catch (err) {
                 state.loading = false; state.error = err.message || 'Something went wrong. Try again.';
                 stopLoadingMessages(); render();
+            }
+        }
+
+        async function buyPack(pack) {
+            try {
+                const response = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pack }),
+                });
+                const data = await response.json();
+                if (data.url) {
+                    window.location.href = data.url;
+                } else {
+                    alert('Payment setup failed. Please try again.');
+                }
+            } catch (e) {
+                alert('Payment error. Please try again.');
             }
         }
 
@@ -901,7 +1184,8 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        render();
+        // Init
+        handleStripeReturn().then(() => render());
     </script>
 </body>
 </html>
