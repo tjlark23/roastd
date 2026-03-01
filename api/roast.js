@@ -1,6 +1,5 @@
-// api/roast.js — Vercel Serverless Function
-// Rate limited: 3 free roasts per IP per day
-// Claude Sonnet 4.5 (analyze + write) → Nano Banana 2 (generate annotated image)
+// api/roast.js — Roastd AI v3
+// Claude Opus 4.6 (extended thinking + deep analysis) → Gemini (framed annotated image)
 
 const ipUsage = new Map();
 const FREE_LIMIT = 3;
@@ -30,7 +29,6 @@ function checkRateLimit(ip) {
   return { allowed: true, remaining: FREE_LIMIT - entry.count };
 }
 
-// Clean old entries every 100 requests
 let requestCount = 0;
 function cleanOldEntries() {
   requestCount++;
@@ -43,33 +41,118 @@ function cleanOldEntries() {
 }
 
 const CATEGORY_PROMPTS = {
-  linkedin: `Analyze this LinkedIn screenshot. Look for: Headline buzzwords, inflated job titles, corporate try-hard photos, humble brags, "open to work" energy. Write 4 brutal roast annotations targeting professional cringe. Mock choices, not appearance.`,
-  twitter: `Analyze this Twitter/X screenshot. Look for: Bio personality claims, follower ratio, display name cringe, badges, clout chasing. Write 4 brutal roast annotations targeting their Twitter personality.`,
-  dating: `Analyze this dating profile screenshot. Look for: Photo choices (group photos, mirror selfies, fish pics), bio cliches ("tacos", "The Office", "fluent in sarcasm"), prompt answers. Write 4 brutal roast annotations targeting dating profile cliches.`,
-  pet: `Analyze this pet photo. Look for: Pet's expression, outfit/costume, setting, accessories. Write 4 brutal roast annotations FROM THE PET'S PERSPECTIVE roasting their owner.`,
-  selfie: `Analyze this selfie. Look for: Setting (bathroom mirror, car, gym), angles, filters, background disasters. Write 4 brutal roast annotations about their selfie game and need for validation.`,
-  room: `Analyze this room/apartment photo. Look for: Cleanliness, decoration choices, cable management, furniture. Write 4 brutal roast annotations about their life choices as shown by their living space.`,
-  wedding: `Analyze this wedding photo. Look for: Pinterest-inspired poses, venue, fashion choices, props. Write 4 brutal roast annotations about the wedding Pinterest board energy. Funny, not mean about the relationship.`,
-  gym: `Analyze this gym/fitness photo. Look for: Flex pose, outfit, equipment, mirror selfie quality, background gym-goers. Write 4 brutal roast annotations about their need to document working out.`,
-  resume: `Analyze this resume screenshot. Look for: Inflated job titles, outdated skills, formatting choices, buzzwords, gaps. Write 4 brutal roast annotations about their resume.`,
-  car: `Analyze this car photo. Look for: What the car says about the owner, how they photographed it, modifications, cleanliness. Write 4 brutal roast annotations about their car and personality.`,
+  linkedin: `This is a LinkedIn profile screenshot. Study it CAREFULLY. Read every word. Look at:
+- Their headline: what buzzwords are they using? What do they ACTUALLY do vs what they claim?
+- Their photo: corporate headshot? Casual? Arms crossed power pose? Weird background?
+- Follower/connection count: flex or embarrassing?
+- Any "Open to Work" banner?
+- Job title inflation ("Chief Synergy Officer")
+- Humble brags in the about section
+- Endorsements, featured posts, anything cringe
+The comedy goldmine is the GAP between who they ARE and who they're PRETENDING to be on LinkedIn.`,
+
+  twitter: `This is a Twitter/X profile screenshot. Study every detail:
+- Bio: what personality are they performing? "Thought leader"? Emoji soup? Podcast link?
+- Follower/following ratio: are they desperate? Or are they getting ratio'd?
+- Display name vs handle: cringe mismatch?
+- Pinned tweet energy
+- Blue checkmark (paid for clout?)
+- Header image choices
+The comedy is in their desperate need for engagement and the persona they've constructed.`,
+
+  dating: `This is a dating profile screenshot. Analyze everything:
+- Photo choices: bathroom mirror selfie? Group photo where you can't tell who they are? Fish pic? Machu Picchu pic everyone has?
+- Bio cliches: "love tacos", "fluent in sarcasm", "The Office", "looking for partner in crime"
+- Prompt answers that reveal too much or too little
+- Height listed (or conspicuously not listed)
+- "Just ask" energy
+The comedy is in the universal dating app desperation and the cliches they think make them unique.`,
+
+  pet: `This is a photo with a pet. The twist: WRITE FROM THE PET'S PERSPECTIVE roasting their owner.
+- What is the pet's expression saying about their owner?
+- Is the pet in a costume? (The pet has opinions about this)
+- What does the background reveal about the owner's life?
+- Is this pet clearly the more attractive one in the household?
+The pet is smarter than the owner and wants everyone to know it.`,
+
+  selfie: `This is a selfie. Analyze the full scene:
+- Location: bathroom? Car? Gym? Bedroom chaos in background?
+- Angle: the chin-up "hide the double chin" angle? The "I'm looking away pretending I don't know there's a camera" angle?
+- Filter usage level
+- What's happening in the background they didn't notice?
+- The lighting they think is good
+The comedy is in the desperate need for external validation through selfies.`,
+
+  room: `This is a photo of someone's room/living space. CSI-level analysis:
+- Cleanliness disaster areas they probably didn't notice
+- Decoration choices that reveal their personality
+- The gaming setup vs the rest of the room ratio
+- Cable management (or lack thereof)
+- What does this room say about their dating life?
+- Anything on the walls? Tapestries? LED strips? Live Laugh Love?
+The room is a crime scene of life choices.`,
+
+  wedding: `This is a wedding photo. Look for:
+- Pinterest-board-come-to-life energy
+- Pose choices (the dip, the forehead touch, the looking-different-directions)
+- Bridesmaids/groomsmen suffering
+- Venue flex or budget reveal
+- Mason jars, burlap, "love is sweet take a treat"
+- Sparkler exit that took 45 minutes to set up
+The comedy is in the industrial wedding complex, not the actual couple's relationship.`,
+
+  gym: `This is a gym/fitness photo. Full analysis:
+- The pump is temporary but the photo is forever
+- Are they flexing but pretending they're not?
+- What equipment are they near? (Using the machines wrong?)
+- Mirror selfie with phone covering face
+- Outfit choices: full matching set or ratty college shirt?
+- "Just finished" sweat performance
+The comedy is in their need to document exercise instead of just doing it.`,
+
+  resume: `This is a resume screenshot. Read it like a detective:
+- Job title inflation ("Led cross-functional synergies")
+- Skills section hilarity (Microsoft Word in 2024?)
+- Employment gaps they're trying to hide
+- Font and formatting crimes
+- "References available upon request" (nobody asked)
+- Objective statement that means nothing
+The comedy is in professional embellishment and resume theater.`,
+
+  car: `This is a car photo. Full personality analysis:
+- What does this car say about who they WANT to be?
+- How they photographed it (golden hour? Gas station?)
+- Modifications or accessories that tell a story
+- Interior cleanliness (or dashboard archaeology)
+- Is this a "just washed it" flex?
+- Bumper stickers? Air freshener? Steering wheel cover?
+The car is a personality test they didn't know they were taking.`,
 };
 
 const STYLE_PROMPTS = {
-  genz: `Write in Gen Z slang: lowkey, no cap, fr fr, giving, delulu, bruh, it's giving. Casual lowercase. Short punchy. Sound real, not parody.`,
-  boomer: `Write as confused, disappointed Boomer Dad. "Back in my day" energy. References mowing lawns, real jobs, firm handshakes. Deadpan, genuinely baffled.`,
-  shakespeare: `Write in Shakespearean English. Use thee, thou, verily, forsooth, doth, hath, methinks. Dramatically insulting. Literary wit + genuine disgust.`,
-  asian_parent: `Write as Disappointed Asian Parent. Compare to doctor/lawyer cousins. Question every choice. "Why not doctor?" Short devastating comparisons. Palpable guilt.`,
-  jackson: `Write as Samuel L. Jackson. Aggressive, intense. Use "motherfucker" naturally. Bold, confrontational. Pulp Fiction energy. Personally offended.`,
-  coworker: `Write as Passive Aggressive Coworker. "Per my last email" energy. Backhanded compliments. Fake niceness masking judgment. Corporate speak delivering devastation.`,
-  jewish_mom: `Write as Jewish Mother. Guilt trips wrapped in love. Compare to cousins, neighbors' children. "I'm not saying anything, I'm just saying." Concerned disappointment.`,
-  british: `Write as British Royalty. "How frightfully common" energy. Dry, withering. Words: dreadful, ghastly, quite, rather, how vulgar. Maximum condescension with perfect manners.`,
-  aussie: `Write as Australian Bogan. Use: mate, yeah nah, get fucked, cooked, drongo, bloody hell, fair dinkum. Blunt no-filter Australian honesty.`,
-  redneck: `Write as Redneck. Use: boy, what in tarnation, I tell you what, dang, reckon, ain't, bless your heart. Southern observations from a porch with a beer.`,
+  genz: `VOICE: Gen Z roasting their elders. Use: lowkey, no cap, fr fr, giving, delulu, bruh, it's giving, ick, slay (sarcastic), the way I screamed, I can't, bestie (condescending), rent free, that's so cheugy. Short sentences. Lowercase energy. Like you're texting your group chat screenshots of this person.`,
+
+  boomer: `VOICE: A confused, disappointed Boomer Dad who just discovered the internet. References: mowing the lawn, firm handshakes, "back in my day we had REAL jobs", Vietnam or "the war", newspapers, his buddy Gary from the lodge. He's genuinely baffled by modern life. Deadpan delivery. Everything reminds him of something that was better in 1978.`,
+
+  shakespeare: `VOICE: Shakespeare writing his most savage play yet. Use thee, thou, verily, forsooth, doth, hath, methinks, pray tell, villain, knave, varlet, wretch. The insults should sound like lost passages from his lesser-known works. Dramatically over-the-top disgust delivered in perfect iambic rhythm.`,
+
+  asian_parent: `VOICE: Disappointed Asian Parent at the dinner table. Compare EVERYTHING to cousins, doctor neighbors, anyone doing better. "Why not doctor?" "Your cousin bought house already." Short devastating comparisons. Mix in some guilt: "I sacrifice everything and THIS is what you do?" The disappointment should be PALPABLE. Love expressed only through criticism.`,
+
+  jackson: `VOICE: Samuel L. Jackson personally offended by this image. Use "motherfucker" naturally (not forced). Pulp Fiction meets a comedy roast. He's ANGRY but articulate. "Say what one more time" energy. Bold, confrontational, personally insulted that this image exists. Capital letters for emphasis. He can't believe what he's looking at.`,
+
+  coworker: `VOICE: Your passive-aggressive coworker who's "just trying to help." Uses: "Per my last email...", "Just circling back...", "Not sure if you saw my message...", "No worries at all! :)", "That's certainly ONE way to do it..." Backhanded compliments dripping with fake niceness. CC's your manager on the roast. Corporate speak delivering absolute devastation.`,
+
+  jewish_mom: `VOICE: Jewish Mother who only wants the best for you (and for you to know how much she suffers). Guilt wrapped in love. "I'm not saying anything, I'm just saying..." Compares you to the Goldstein's son (the doctor). Mentions her health whenever criticized. "You don't call, you don't write, and NOW this?" Every roast ends with offering food.`,
+
+  british: `VOICE: British Royalty who's been forced to look at something frightfully common. Words: dreadful, ghastly, quite, rather, how vulgar, one simply doesn't, good heavens, I do declare, positively medieval. Maximum condescension with perfect manners. They'd never stoop to actual anger; they're simply... deeply, quietly appalled. Dry wit that cuts without raising its voice.`,
+
+  aussie: `VOICE: Australian Bogan at the pub seeing this image for the first time. Use: mate, yeah nah, get fucked, cooked, drongo, bloody hell, fair dinkum, strewth, no wuckas, she'll be right, chuck a sickie, bogan, have a go ya mug. ZERO filter. Blunt Australian honesty delivered while holding a VB. Not mean-spirited, just absolutely no filter between brain and mouth.`,
+
+  redneck: `VOICE: Redneck on his porch with a beer, philosophizing about what he's seeing. Use: boy, what in tarnation, I tell you what, I reckon, dang, ain't, bless your heart (devastating), fixin' to, yonder, down yonder, like a [animal] doing [thing]. Southern observations that are accidentally profound. He means well but has no chill. References his truck, his cousin, church on Sunday.`,
 };
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 120,
 };
 
 export default async function handler(req, res) {
@@ -93,12 +176,10 @@ export default async function handler(req, res) {
       if (!limit.allowed) {
         return res.status(429).json({ 
           error: "free_limit_reached",
-          message: "You've used your 3 free roasts today. Buy more to keep the destruction going.",
+          message: "You've used your 3 free roasts today.",
           remaining: 0,
         });
       }
-      
-      // Include remaining in successful responses
       req._remaining = limit.remaining;
     }
 
@@ -112,7 +193,7 @@ export default async function handler(req, res) {
     const categoryPrompt = CATEGORY_PROMPTS[category] || CATEGORY_PROMPTS.selfie;
     const stylePrompt = STYLE_PROMPTS[style] || STYLE_PROMPTS.genz;
 
-    // ═══════ STEP 1: Claude Sonnet 4.5 — Analyze + Write Roast ═══════
+    // ═══════ STEP 1: Claude Opus 4.6 — Deep Analysis + Comedy Writing ═══════
     const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -121,8 +202,12 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 1024,
+        model: "claude-opus-4-6",
+        max_tokens: 16000,
+        thinking: {
+          type: "enabled",
+          budget_tokens: 10000,
+        },
         messages: [{
           role: "user",
           content: [
@@ -132,21 +217,50 @@ export default async function handler(req, res) {
             },
             {
               type: "text",
-              text: `You are a brutal but hilarious roast comedian. Analyze this image and write devastating roast annotations.
+              text: `You are a PROFESSIONAL ROAST COMEDIAN writing material for a comedy special. This isn't a casual joke — this is your career. Every line needs to LAND.
 
+STEP 1 — DEEP IMAGE ANALYSIS (use your thinking to study this):
 ${categoryPrompt}
 
-STYLE: ${stylePrompt}
+Read every visible word. Count followers. Read bios. Note specific details. The SPECIFICITY is what makes roasts funny. "Nice photo" isn't funny. "You spent $200 on a ring light and THIS is the result" is funny.
 
-Rules:
-- 4 annotations, max 10 words each
-- Be specific to what you SEE
-- Mock choices/behavior, not physical appearance
-- Genuinely funny, not just mean
-- One "overall burn" summary line (max 15 words)
+STEP 2 — WRITE THE ROAST
+${stylePrompt}
 
-Return ONLY valid JSON, no markdown:
-{"annotations":[{"text":"...","location":"where it points"},{"text":"...","location":"..."},{"text":"...","location":"..."},{"text":"...","location":"..."}],"overall_burn":"devastating summary"}`,
+Write exactly 7 roast annotations. Here's how they'll be used on the image:
+- Annotations 1-2: These go DIRECTLY ON the image as hand-drawn red text. Keep these punchy (under 12 words). These should reference something visually obvious.
+- Annotations 3-7: These go in a WHITE FRAME around the image with arrows pointing to specific things. These can be longer (up to 20 words) and more detailed/funny since they have space.
+
+Also write:
+- 1 "overall_burn" headline (max 12 words) — goes at the bottom of the frame. This is the TITLE of the roast. Make it devastating.
+- 1 "sketch_idea" — a tiny funny doodle to add to the image (e.g., "thought bubble above their head saying 'I peaked in 2019'", "a trophy labeled 'World's Most Average'", "a Yelp star rating: 2.5 stars"). Keep it simple enough to draw.
+
+COMEDY RULES:
+- Be SPECIFIC to what you see. Generic = death. Reference exact things in the image.
+- Setup + punchline structure. Don't just describe — make a JOKE.
+- Punch UP on their choices, not DOWN on their appearance.
+- Go harder than you think you should. Milquetoast is worse than too far.
+- Weird, unexpected angles are funnier than obvious ones.
+- If something is genuinely impressive, roast the flex itself.
+- Pop culture references that fit = gold.
+- Each annotation should make someone laugh out loud, not just smirk.
+
+Return ONLY valid JSON, no markdown, no backticks:
+{
+  "on_image": [
+    {"text": "...", "location": "specific area of image this points to"},
+    {"text": "...", "location": "specific area"}
+  ],
+  "in_frame": [
+    {"text": "...", "location": "what the arrow points to in the image"},
+    {"text": "...", "location": "..."},
+    {"text": "...", "location": "..."},
+    {"text": "...", "location": "..."},
+    {"text": "...", "location": "..."}
+  ],
+  "overall_burn": "devastating headline summary",
+  "sketch_idea": "simple funny doodle description"
+}`,
             },
           ],
         }],
@@ -155,34 +269,74 @@ Return ONLY valid JSON, no markdown:
 
     if (!claudeResponse.ok) {
       const errText = await claudeResponse.text();
-      console.error("Claude error status:", claudeResponse.status, "body:", errText);
+      console.error("Claude error:", claudeResponse.status, errText.substring(0, 300));
       return res.status(500).json({ error: `Claude API error ${claudeResponse.status}: ${errText.substring(0, 200)}` });
     }
 
     const claudeData = await claudeResponse.json();
-    const claudeText = claudeData.content?.[0]?.text || "";
+    
+    // Extract text from response (may have thinking blocks)
+    let claudeText = "";
+    for (const block of claudeData.content || []) {
+      if (block.type === "text") {
+        claudeText = block.text;
+        break;
+      }
+    }
+
+    if (!claudeText) {
+      console.error("No text in Claude response:", JSON.stringify(claudeData.content?.map(b => b.type)));
+      return res.status(500).json({ error: "Claude had nothing to say. Try again." });
+    }
 
     let roastData;
     try {
       roastData = JSON.parse(claudeText.replace(/```json\n?|\n?```/g, "").trim());
     } catch (e) {
-      console.error("Parse error:", claudeText);
+      console.error("Parse error. Raw text:", claudeText.substring(0, 500));
       return res.status(500).json({ error: "Claude was too brutal to be contained. Try again." });
     }
 
-    // ═══════ STEP 2: Nano Banana 2 — Generate Annotated Image ═══════
-    const annotationList = roastData.annotations
-      .map((a, i) => `${i + 1}. "${a.text}" — arrow pointing to ${a.location}`)
+    // ═══════ STEP 2: Gemini — Generate Framed Annotated Image ═══════
+    
+    // Build annotation instructions for ON the image
+    const onImageAnnotations = (roastData.on_image || [])
+      .map((a, i) => `ON-IMAGE ${i + 1}: Write "${a.text}" with arrow pointing to ${a.location}`)
       .join("\n");
 
-    const geminiPrompt = `Take this uploaded image and add hand-drawn red marker annotations roasting it.
+    // Build annotation instructions for IN the frame
+    const inFrameAnnotations = (roastData.in_frame || [])
+      .map((a, i) => `FRAME ${i + 1}: Write "${a.text}" with arrow from the white frame pointing into the image at ${a.location}`)
+      .join("\n");
 
-Annotations with arrows:
-${annotationList}
+    const geminiPrompt = `TASK: Create a roast image with a WHITE FRAME around the original photo, with hand-drawn annotations.
 
-At the bottom write in larger text: "${roastData.overall_burn}"
+LAYOUT INSTRUCTIONS:
+1. Place the uploaded image in the CENTER, slightly reduced in size (about 70-75% of the total canvas)
+2. Surround it with a WHITE BORDER/FRAME on all sides (like a photo in a white picture frame or matte)
+3. The white frame should be wide enough to write text in — about 15-20% of the image width on each side
 
-Style: Messy real handwriting with red sharpie (NOT computer font). Slightly tilted, imperfect letters, varying sizes. Draw arrows to specific areas. Circle one or two things. Keep original image fully visible underneath. Add small "Roastd.ai" in bottom-right corner.`;
+ANNOTATIONS ON THE IMAGE (red marker, hand-drawn style):
+${onImageAnnotations}
+
+ANNOTATIONS IN THE WHITE FRAME (written in the white border area, with arrows pointing into the image):
+${inFrameAnnotations}
+
+SKETCH/DOODLE (small, funny, hand-drawn):
+${roastData.sketch_idea || "a small funny doodle"}
+
+BOTTOM OF FRAME:
+Write the headline: "${roastData.overall_burn}" in larger hand-drawn text at the bottom of the white frame.
+In the bottom-right corner of the white frame, write "roastdai.com" in small neat text.
+
+STYLE REQUIREMENTS:
+- ALL text must be hand-drawn red marker/sharpie style (NOT computer font)
+- Slightly messy, tilted, varying sizes — like someone actually scribbled on a printed photo
+- Arrows should be hand-drawn, not straight
+- Circle or underline 1-2 things on the actual image
+- The white frame should be CLEAN white — text and arrows only
+- Keep the original image fully visible and clear
+- The sketch/doodle should be simple and small`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
@@ -202,9 +356,9 @@ Style: Messy real handwriting with red sharpie (NOT computer font). Slightly til
     );
 
     if (!geminiResponse.ok) {
-      const gemErrText = await geminiResponse.text();
-      console.error("Gemini error status:", geminiResponse.status, "body:", gemErrText);
-      return res.status(500).json({ error: `Gemini API error ${geminiResponse.status}: ${gemErrText.substring(0, 200)}` });
+      const gemErr = await geminiResponse.text();
+      console.error("Gemini error:", geminiResponse.status, gemErr.substring(0, 300));
+      return res.status(500).json({ error: `Gemini API error ${geminiResponse.status}: ${gemErr.substring(0, 200)}` });
     }
 
     const geminiData = await geminiResponse.json();
