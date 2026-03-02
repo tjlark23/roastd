@@ -260,17 +260,18 @@ Return ONLY this JSON. No markdown, no backticks, no other text:
     const imgW = imgMeta.width;
     const imgH = imgMeta.height;
     
-    // Add 25% padding on ALL sides (equal spacing)
-    const padX = Math.round(imgW * 0.25);
-    const padY = Math.round(imgH * 0.25);
+    // Add 40% padding on sides and 30% top/bottom for big white frame
+    const padX = Math.round(imgW * 0.40);
+    const padTop = Math.round(imgH * 0.25);
+    const padBottom = Math.round(imgH * 0.35); // extra room for headline
     const canvasW = imgW + padX * 2;
-    const canvasH = imgH + padY * 2;
+    const canvasH = imgH + padTop + padBottom;
     
     // Create white canvas with photo centered
     const framedBuffer = await sharp({
       create: { width: canvasW, height: canvasH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
     })
-    .composite([{ input: imgBuffer, left: padX, top: padY }])
+    .composite([{ input: imgBuffer, left: padX, top: padTop }])
     .png()
     .toBuffer();
     
@@ -284,36 +285,32 @@ Return ONLY this JSON. No markdown, no backticks, no other text:
       .map((a, i) => `  ${i + 1}. "${a.text}" — draw an arrow from this text into the photo pointing at ${a.points_to}`)
       .join("\n");
 
-    const geminiPrompt = `This image is a photo with a wide white border around it. Your job is to write funny roast annotations on it using red marker handwriting.
+    const geminiPrompt = `This image shows a photo centered on a large white background. Write funny roast annotations on it using red marker handwriting.
 
-THE IMAGE HAS TWO ZONES:
-- THE PHOTO (the image in the center)
-- THE WHITE BORDER (the wide white space surrounding the photo on all four sides)
+THE PHOTO is the image in the center. THE WHITE SPACE is the large white area surrounding it on all sides.
 
-=== WRITE ON THE PHOTO (25% of content — keep it minimal) ===
-1. Write "${callout.text || ''}" in red handwriting with a white outline around each letter (so it's readable on any color). Draw a hand-drawn arrow pointing to ${callout.points_to || 'the most obvious thing'}.
-2. Draw one tiny simple doodle in an open area of the photo: ${roastData.sketch_idea || "a small funny doodle"}. Keep it tiny.
-3. Circle or underline one funny detail.
-That is ALL that goes on the photo. Keep it clean.
+=== ON THE PHOTO (keep it clean — only these 3 things) ===
+1. Write "${callout.text || ''}" in red handwriting with a thick white outline around each letter. Draw a wobbly arrow pointing to ${callout.points_to || 'the center'}.
+2. Draw one tiny doodle in an open area: ${roastData.sketch_idea || "a small funny doodle"}.
+3. Circle one funny detail.
+Nothing else on the photo.
 
-=== WRITE IN THE WHITE BORDER (75% of content) ===
-Write these jokes in the white border space around the photo. Spread them out — some on left, some on right, one on top. Draw hand-drawn arrows from each one pointing into the photo:
+=== IN THE WHITE SPACE (all main text goes here) ===
+Write these jokes ONLY in the white area around the photo. Spread them out on all sides. Draw wobbly arrows from each one pointing into the photo:
 ${frameAnnotations}
 
-IMPORTANT: This text goes ONLY in the white space. Do NOT write any of these on top of the photo. Only the arrows cross into the photo.
+=== AT THE BOTTOM OF THE WHITE SPACE ===
+Write in bigger letters: "${roastData.overall_burn || ''}"
 
-=== BOTTOM OF WHITE BORDER ===
-Write in bigger text: "${roastData.overall_burn || ''}"
-Bottom-right corner, small: "roastdai.com"
-
-=== HANDWRITING RULES ===
-- ALL text must look like real RED SHARPIE handwriting — wobbly, uneven, tilted, different letter sizes
-- On the photo: red text with visible WHITE OUTLINE so it pops against any background
-- In the white border: plain red text (no outline needed on white)  
-- Arrows are wobbly hand-drawn curves, never straight lines
-- NEVER use computer fonts, printed text, or typed-looking text anywhere
-- Do NOT write any watermarks or stamps across the photo
-- Do NOT use any colors besides red for text`;
+=== STYLE ===
+- ALL text = red Sharpie handwriting. Wobbly, uneven, tilted letters. Like a real person scrawling.
+- On the photo: red with white outline around letters so it's readable on any color.
+- In the white space: plain red (no outline needed).
+- Arrows = wobbly curves, never straight.
+- NEVER use computer fonts or printed text.
+- NEVER stamp or write anything across the center of the photo.
+- NEVER add any watermarks, logos, or website names.
+- ONLY use red color for all text and arrows.`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
@@ -360,6 +357,30 @@ Bottom-right corner, small: "roastdai.com"
 
     if (!generatedImageBase64) {
       return res.status(500).json({ error: "No image in response. Try again." });
+    }
+
+    // Add roastdai.com watermark via code (bottom-right corner)
+    try {
+      const resultBuffer = Buffer.from(generatedImageBase64, 'base64');
+      const resultMeta = await sharp(resultBuffer).metadata();
+      const rW = resultMeta.width || 800;
+      const rH = resultMeta.height || 800;
+      const fontSize = Math.max(14, Math.round(rW * 0.02));
+      
+      const svgWatermark = Buffer.from(`<svg width="${rW}" height="${rH}">
+        <text x="${rW - 10}" y="${rH - 10}" font-family="Arial, sans-serif" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.7">roastdai.com</text>
+      </svg>`);
+      
+      const watermarkedBuffer = await sharp(resultBuffer)
+        .composite([{ input: svgWatermark, top: 0, left: 0 }])
+        .png()
+        .toBuffer();
+      
+      generatedImageBase64 = watermarkedBuffer.toString('base64');
+      generatedMimeType = 'image/png';
+    } catch (wmErr) {
+      console.error("Watermark error (non-fatal):", wmErr.message);
+      // Continue without watermark if it fails
     }
 
     return res.status(200).json({
