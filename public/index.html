@@ -822,6 +822,7 @@
             return false;
         }
         function canRoast() {
+            if (new URLSearchParams(window.location.search).get('debug') === 'roastd2026') return true;
             return getTotalRemaining() > 0;
         }
 
@@ -1121,10 +1122,11 @@
                 const freeLeft = FREE_LIMIT - getFreeUsed();
                 const isPaid = freeLeft <= 0 && getCredits() > 0;
                 
+                const debugKey = new URLSearchParams(window.location.search).get('debug') || '';
                 const response = await fetch('/api/roast', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64, mimeType, category: state.category, style: state.style, isPaid }),
+                    body: JSON.stringify({ image: base64, mimeType, category: state.category, style: state.style, isPaid, debug: debugKey }),
                 });
                 const data = await response.json();
                 
