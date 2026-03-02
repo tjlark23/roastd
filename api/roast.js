@@ -158,64 +158,52 @@ export default async function handler(req, res) {
             },
             {
               type: "text",
-              text: `You are a HEADLINING ROAST COMEDIAN. You've been hired to absolutely destroy whoever uploaded this photo. Your reputation depends on every single line being laugh-out-loud funny.
+              text: `You write roasts for the internet. Not corporate comedy. Not "ha that's clever." The kind of shit people screenshot and send to group chats. The kind that makes someone go "OH NO" and then laugh for 10 seconds.
 
-IMPORTANT: Follow these steps IN ORDER before writing the final output.
-
-═══ STEP 1: FORENSIC IMAGE ANALYSIS ═══
-Study this image like a detective. Identify:
-- Every piece of text visible (read it ALL word for word)
-- Specific objects, clothing, setting details
-- What the person is clearly trying to project vs. what's actually happening
-- The single most roastable thing in this image
-- Any background details that are unintentionally funny
-- Numbers: follower counts, dates, stats, anything specific
+FIRST: Study this image carefully. Read every word. Note every detail. The specifics are everything.
 
 ${categoryPrompt}
 
-═══ STEP 2: FIND THE COMEDY ANGLES ═══
-Based on what you observed, brainstorm 6-8 possible comedy angles. For each one, ask:
-- What's the SETUP? (the observation)
-- What's the PUNCH? (the unexpected twist, comparison, or exaggeration)
-- Is this SPECIFIC to THIS image or could it apply to anyone? (if anyone, discard it)
+HERE'S WHAT MAKES A ROAST FUNNY VS. GENERIC:
 
-Good: "Your headline says 'Disrupting the Future of Synergy' but your background is a Panera Bread"
-Bad: "Nice profile pic" (generic, could be anyone)
+FUNNY: "59k followers watching a man use LinkedIn like a dating app"
+GENERIC: "wow so many followers lol"
+WHY: The funny version takes a real detail (59k) and reframes it in an unexpected way.
 
-═══ STEP 3: WRITE THE FINAL ROAST ═══
+FUNNY: "'View my newsletter' button doing more work than the entire company"  
+GENERIC: "he has a newsletter button that's cringe"
+WHY: The funny version personifies the button and makes a comparison that stings.
+
+FUNNY: "Paid for Premium so LinkedIn would stop suggesting real jobs"
+GENERIC: "he paid for premium lol"
+WHY: The funny version implies something devastating about the person through the detail.
+
+THE PATTERN: Take a specific detail you can see → reframe it in a way that's mean, surprising, or reveals something embarrassing they didn't intend to show.
+
+WHAT TO AVOID:
+- Just describing what you see ("nice headshot", "interesting bio") — that's not a joke
+- Vague insults that could apply to anyone ("cringe profile", "trying too hard")
+- Repeating the same angle twice
+- Being clever instead of funny — nobody cares about wordplay, they want to LAUGH
+- Obscure references or fancy vocabulary — write like a funny person texts
+
+NOW WRITE THE ROAST:
 ${stylePrompt}
 
-From your comedy angles, pick the BEST and write:
-
-1. ONE "callout" (max 8 words) — goes directly ON the photo with an arrow. Pick the single funniest visual detail. Short, punchy, devastating.
-
-2. FOUR "frame" jokes (8-15 words each) — go in a white border AROUND the photo. These are your A-material. Each must be a complete joke, not just an observation. Setup + punch in one line.
-
-3. ONE "overall_burn" headline (max 10 words) — the title. The thing people screenshot and share.
-
-4. ONE "sketch_idea" — a tiny doodle for an empty area of the photo. Dead simple (stick figure, speech bubble, star rating, small symbol). Must be funny in context. Examples: a small "2/10", a thought bubble saying something short, a tiny award ribbon.
-
-QUALITY CHECK before outputting:
-- Would each line make a room of comedians laugh? If not, rewrite it.
-- Is every joke SPECIFIC to this exact image? If it could apply to anyone, cut it.
-- Are you roasting choices/behavior (good) or appearance (bad)?
-- Did you go hard enough? Too safe = failure.
-- NEVER repeat the same joke, reference, or word across multiple annotations. Every line must be a completely different angle.
-- Use simple words everyone knows. No niche/obscure vocabulary. Write at a 7th grade reading level. If your mom wouldn't get the joke, rewrite it.
-- The callout text is MAX 8 words. Count them. If it's over 8, shorten it.
-
-Return ONLY this JSON. No markdown, no backticks, no other text:
+Return exactly this JSON structure. No markdown, no backticks, no explanation before or after:
 {
-  "callout": {"text": "short punchy line", "points_to": "what the arrow points at"},
+  "callout": {"text": "MAX 8 WORDS — the single funniest visual detail, short and brutal", "points_to": "what the arrow should point at in the image"},
   "frame": [
-    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
-    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
-    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
-    {"text": "joke with setup and punch", "points_to": "what arrow points at"}
+    {"text": "8-15 word joke — must have a punchline, not just an observation", "points_to": "what to point at"},
+    {"text": "different angle, different joke, still specific to this image", "points_to": "what to point at"},
+    {"text": "the one that makes people say OH NO", "points_to": "what to point at"},
+    {"text": "your closer — leave them dead", "points_to": "what to point at"}
   ],
-  "overall_burn": "devastating headline",
-  "sketch_idea": "simple doodle description"
-}`,
+  "overall_burn": "max 10 words — the headline people share. Make it devastating.",
+  "sketch_idea": "tiny simple doodle idea for an empty area — a price tag, a rating, a thought bubble, something dead simple and contextually funny"
+}
+
+FINAL CHECK: Read each joke back. If your reaction is "that's fine" instead of "oh SHIT" — rewrite it. Every line should hit.`,
             },
           ],
         }],
@@ -368,8 +356,8 @@ Write in bigger letters: "${roastData.overall_burn || ''}"
       const rH = resultMeta.height || 800;
       const fontSize = Math.max(14, Math.round(rW * 0.02));
       
-      const svgWatermark = Buffer.from(`<svg width="${rW}" height="${rH}">
-        <text x="${rW - 10}" y="${rH - 10}" font-family="Arial, sans-serif" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.7">roastdai.com</text>
+      const svgWatermark = Buffer.from(`<svg width="${rW}" height="${rH}" xmlns="http://www.w3.org/2000/svg">
+        <text x="${rW - 15}" y="${rH - 15}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.8">roastdai.com</text>
       </svg>`);
       
       const watermarkedBuffer = await sharp(resultBuffer)
