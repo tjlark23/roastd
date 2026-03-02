@@ -1,5 +1,5 @@
-// api/roast.js — Roastd AI v3
-// Claude Opus 4.6 (extended thinking + deep analysis) → Gemini (framed annotated image)
+// api/roast.js — Roastd AI v4
+// Claude Sonnet 4.5 (step-by-step comedy writing) → Gemini (framed annotated image)
 
 const ipUsage = new Map();
 const FREE_LIMIT = 3;
@@ -41,118 +41,61 @@ function cleanOldEntries() {
 }
 
 const CATEGORY_PROMPTS = {
-  linkedin: `This is a LinkedIn profile screenshot. Study it CAREFULLY. Read every word. Look at:
-- Their headline: what buzzwords are they using? What do they ACTUALLY do vs what they claim?
-- Their photo: corporate headshot? Casual? Arms crossed power pose? Weird background?
-- Follower/connection count: flex or embarrassing?
-- Any "Open to Work" banner?
-- Job title inflation ("Chief Synergy Officer")
-- Humble brags in the about section
-- Endorsements, featured posts, anything cringe
-The comedy goldmine is the GAP between who they ARE and who they're PRETENDING to be on LinkedIn.`,
+  linkedin: `SUBJECT: LinkedIn profile screenshot.
+LOOK FOR: Headline buzzwords, inflated titles, corporate headshot pose, "Open to Work" banner, follower count, humble brags, endorsements nobody asked for, the gap between who they ARE and who they PRETEND to be. Read every visible word.`,
 
-  twitter: `This is a Twitter/X profile screenshot. Study every detail:
-- Bio: what personality are they performing? "Thought leader"? Emoji soup? Podcast link?
-- Follower/following ratio: are they desperate? Or are they getting ratio'd?
-- Display name vs handle: cringe mismatch?
-- Pinned tweet energy
-- Blue checkmark (paid for clout?)
-- Header image choices
-The comedy is in their desperate need for engagement and the persona they've constructed.`,
+  twitter: `SUBJECT: Twitter/X profile screenshot.
+LOOK FOR: Bio personality performance, follower/following ratio (desperate?), display name cringe, blue checkmark (paid for validation?), pinned tweet energy, header image choices, emoji usage in bio, "thought leader" delusions.`,
 
-  dating: `This is a dating profile screenshot. Analyze everything:
-- Photo choices: bathroom mirror selfie? Group photo where you can't tell who they are? Fish pic? Machu Picchu pic everyone has?
-- Bio cliches: "love tacos", "fluent in sarcasm", "The Office", "looking for partner in crime"
-- Prompt answers that reveal too much or too little
-- Height listed (or conspicuously not listed)
-- "Just ask" energy
-The comedy is in the universal dating app desperation and the cliches they think make them unique.`,
+  dating: `SUBJECT: Dating profile screenshot.
+LOOK FOR: Photo choices (bathroom selfie? fish pic? Machu Picchu everyone has?), bio cliches ("love tacos", "fluent in sarcasm", "looking for partner in crime"), prompt answers, height listed or conspicuously missing, "just ask" energy.`,
 
-  pet: `This is a photo with a pet. The twist: WRITE FROM THE PET'S PERSPECTIVE roasting their owner.
-- What is the pet's expression saying about their owner?
-- Is the pet in a costume? (The pet has opinions about this)
-- What does the background reveal about the owner's life?
-- Is this pet clearly the more attractive one in the household?
-The pet is smarter than the owner and wants everyone to know it.`,
+  pet: `SUBJECT: Photo with a pet. TWIST: Write everything FROM THE PET'S PERSPECTIVE roasting their owner.
+LOOK FOR: Pet's expression (judging?), any pet costume (the pet did NOT consent), background mess, what the pet clearly thinks of this person's life choices. The pet is smarter than the owner.`,
 
-  selfie: `This is a selfie. Analyze the full scene:
-- Location: bathroom? Car? Gym? Bedroom chaos in background?
-- Angle: the chin-up "hide the double chin" angle? The "I'm looking away pretending I don't know there's a camera" angle?
-- Filter usage level
-- What's happening in the background they didn't notice?
-- The lighting they think is good
-The comedy is in the desperate need for external validation through selfies.`,
+  selfie: `SUBJECT: Selfie.
+LOOK FOR: Location (bathroom? car? gym?), the angle (chin-up to hide something? looking away "candidly"?), filters, ring light reflection, background disasters, facial expression performance, accessories.`,
 
-  room: `This is a photo of someone's room/living space. CSI-level analysis:
-- Cleanliness disaster areas they probably didn't notice
-- Decoration choices that reveal their personality
-- The gaming setup vs the rest of the room ratio
-- Cable management (or lack thereof)
-- What does this room say about their dating life?
-- Anything on the walls? Tapestries? LED strips? Live Laugh Love?
-The room is a crime scene of life choices.`,
+  room: `SUBJECT: Room/apartment photo.
+LOOK FOR: Cleanliness level, decoration choices (or lack thereof), cable management horror, furniture from college that never got replaced, what the room reveals about this person's inner life, LED strips, tapestries, gaming setup.`,
 
-  wedding: `This is a wedding photo. Look for:
-- Pinterest-board-come-to-life energy
-- Pose choices (the dip, the forehead touch, the looking-different-directions)
-- Bridesmaids/groomsmen suffering
-- Venue flex or budget reveal
-- Mason jars, burlap, "love is sweet take a treat"
-- Sparkler exit that took 45 minutes to set up
-The comedy is in the industrial wedding complex, not the actual couple's relationship.`,
+  wedding: `SUBJECT: Wedding photo.
+LOOK FOR: Pinterest-inspired poses, venue choice, fashion decisions, forced candid moments, matching outfits, wedding party expressions, over-the-top details. Funny about the WEDDING not the relationship.`,
 
-  gym: `This is a gym/fitness photo. Full analysis:
-- The pump is temporary but the photo is forever
-- Are they flexing but pretending they're not?
-- What equipment are they near? (Using the machines wrong?)
-- Mirror selfie with phone covering face
-- Outfit choices: full matching set or ratty college shirt?
-- "Just finished" sweat performance
-The comedy is in their need to document exercise instead of just doing it.`,
+  gym: `SUBJECT: Gym/fitness photo.
+LOOK FOR: The flex pose, outfit choices, mirror selfie angle, pump timing, equipment in frame, other gym-goers in background, the desperate need to document working out instead of just working out.`,
 
-  resume: `This is a resume screenshot. Read it like a detective:
-- Job title inflation ("Led cross-functional synergies")
-- Skills section hilarity (Microsoft Word in 2024?)
-- Employment gaps they're trying to hide
-- Font and formatting crimes
-- "References available upon request" (nobody asked)
-- Objective statement that means nothing
-The comedy is in professional embellishment and resume theater.`,
+  resume: `SUBJECT: Resume screenshot.
+LOOK FOR: Inflated job titles, buzzword density, "proficient in Microsoft Office" energy, formatting crimes, skills section delusions, employment gaps, objective statement cringe, font choices.`,
 
-  car: `This is a car photo. Full personality analysis:
-- What does this car say about who they WANT to be?
-- How they photographed it (golden hour? Gas station?)
-- Modifications or accessories that tell a story
-- Interior cleanliness (or dashboard archaeology)
-- Is this a "just washed it" flex?
-- Bumper stickers? Air freshener? Steering wheel cover?
-The car is a personality test they didn't know they were taking.`,
+  car: `SUBJECT: Car photo.
+LOOK FOR: What this car says about personality, how they photographed it (like it's a model?), modifications, cleanliness, vanity plate, air freshener choices, what they're compensating for.`,
 };
 
 const STYLE_PROMPTS = {
-  genz: `VOICE: Gen Z roasting their elders. Use: lowkey, no cap, fr fr, giving, delulu, bruh, it's giving, ick, slay (sarcastic), the way I screamed, I can't, bestie (condescending), rent free, that's so cheugy. Short sentences. Lowercase energy. Like you're texting your group chat screenshots of this person.`,
+  genz: `VOICE: Gen Z. Use: lowkey, no cap, fr fr, giving, delulu, bruh, its giving, slay (sarcastically), ate (sarcastically), the way that, im screaming, help. Casual lowercase energy. Short devastating sentences. Sound like an actual 19-year-old, not a corporation trying to sound young.`,
 
-  boomer: `VOICE: A confused, disappointed Boomer Dad who just discovered the internet. References: mowing the lawn, firm handshakes, "back in my day we had REAL jobs", Vietnam or "the war", newspapers, his buddy Gary from the lodge. He's genuinely baffled by modern life. Deadpan delivery. Everything reminds him of something that was better in 1978.`,
+  boomer: `VOICE: Disappointed Boomer Dad. "Back in my day" energy. References: mowing lawns, firm handshakes, real jobs, getting up at 5am, newspapers. Genuinely confused by modern choices. Deadpan delivery. Not angry, just... deeply let down.`,
 
-  shakespeare: `VOICE: Shakespeare writing his most savage play yet. Use thee, thou, verily, forsooth, doth, hath, methinks, pray tell, villain, knave, varlet, wretch. The insults should sound like lost passages from his lesser-known works. Dramatically over-the-top disgust delivered in perfect iambic rhythm.`,
+  shakespeare: `VOICE: Shakespearean. Use: thee, thou, verily, forsooth, doth, hath, methinks, prithee, knave, cur, wretched. Dramatically insulting iambic energy. Literary wit meets genuine disgust. Insult like the Bard at his most savage.`,
 
-  asian_parent: `VOICE: Disappointed Asian Parent at the dinner table. Compare EVERYTHING to cousins, doctor neighbors, anyone doing better. "Why not doctor?" "Your cousin bought house already." Short devastating comparisons. Mix in some guilt: "I sacrifice everything and THIS is what you do?" The disappointment should be PALPABLE. Love expressed only through criticism.`,
+  asian_parent: `VOICE: Disappointed Asian Parent. Compare everything to doctor/lawyer cousins. "Why not doctor?" Short devastating comparisons. Guilt that cuts to bone. Maximum guilt per word.`,
 
-  jackson: `VOICE: Samuel L. Jackson personally offended by this image. Use "motherfucker" naturally (not forced). Pulp Fiction meets a comedy roast. He's ANGRY but articulate. "Say what one more time" energy. Bold, confrontational, personally insulted that this image exists. Capital letters for emphasis. He can't believe what he's looking at.`,
+  jackson: `VOICE: Samuel L. Jackson in Pulp Fiction mode. Aggressive, intense, personally offended. Use "motherfucker" where it hits hardest. Bold, confrontational. Like this photo ruined his whole day.`,
 
-  coworker: `VOICE: Your passive-aggressive coworker who's "just trying to help." Uses: "Per my last email...", "Just circling back...", "Not sure if you saw my message...", "No worries at all! :)", "That's certainly ONE way to do it..." Backhanded compliments dripping with fake niceness. CC's your manager on the roast. Corporate speak delivering absolute devastation.`,
+  coworker: `VOICE: Passive-Aggressive Coworker. "Per my last email" energy. Backhanded compliments hiding nuclear devastation. Corporate speak delivering maximum damage with a smile.`,
 
-  jewish_mom: `VOICE: Jewish Mother who only wants the best for you (and for you to know how much she suffers). Guilt wrapped in love. "I'm not saying anything, I'm just saying..." Compares you to the Goldstein's son (the doctor). Mentions her health whenever criticized. "You don't call, you don't write, and NOW this?" Every roast ends with offering food.`,
+  jewish_mom: `VOICE: Jewish Mother. Guilt trips wrapped in love. "I'm not saying anything, I'm just saying." Compares to neighbors' children, cousins, anyone doing better. "You know what, it's fine. I'll just sit here. In the dark."`,
 
-  british: `VOICE: British Royalty who's been forced to look at something frightfully common. Words: dreadful, ghastly, quite, rather, how vulgar, one simply doesn't, good heavens, I do declare, positively medieval. Maximum condescension with perfect manners. They'd never stoop to actual anger; they're simply... deeply, quietly appalled. Dry wit that cuts without raising its voice.`,
+  british: `VOICE: British Royalty. "How frightfully common." Dry, withering, delivered while barely glancing up from tea. Words: dreadful, ghastly, quite, rather, vulgar, pedestrian. Maximum condescension with impeccable manners.`,
 
-  aussie: `VOICE: Australian Bogan at the pub seeing this image for the first time. Use: mate, yeah nah, get fucked, cooked, drongo, bloody hell, fair dinkum, strewth, no wuckas, she'll be right, chuck a sickie, bogan, have a go ya mug. ZERO filter. Blunt Australian honesty delivered while holding a VB. Not mean-spirited, just absolutely no filter between brain and mouth.`,
+  aussie: `VOICE: Australian Bogan. Use: mate, yeah nah, get fucked, cooked, drongo, bloody hell, fair dinkum, dead set. Blunt no-filter Australian pub energy. Says what everyone's thinking but louder.`,
 
-  redneck: `VOICE: Redneck on his porch with a beer, philosophizing about what he's seeing. Use: boy, what in tarnation, I tell you what, I reckon, dang, ain't, bless your heart (devastating), fixin' to, yonder, down yonder, like a [animal] doing [thing]. Southern observations that are accidentally profound. He means well but has no chill. References his truck, his cousin, church on Sunday.`,
+  redneck: `VOICE: Redneck on a porch with a beer. Use: boy, what in tarnation, I tell you what, dang, reckon, ain't, bless your heart (devastating). Southern observations. Folksy wisdom meets brutal honesty.`,
 };
 
 export const config = {
-  maxDuration: 120,
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
@@ -176,10 +119,11 @@ export default async function handler(req, res) {
       if (!limit.allowed) {
         return res.status(429).json({ 
           error: "free_limit_reached",
-          message: "You've used your 3 free roasts today.",
+          message: "You've used your 3 free roasts today. Buy more to keep the destruction going.",
           remaining: 0,
         });
       }
+      
       req._remaining = limit.remaining;
     }
 
@@ -193,7 +137,7 @@ export default async function handler(req, res) {
     const categoryPrompt = CATEGORY_PROMPTS[category] || CATEGORY_PROMPTS.selfie;
     const stylePrompt = STYLE_PROMPTS[style] || STYLE_PROMPTS.genz;
 
-    // ═══════ STEP 1: Claude Opus 4.6 — Deep Analysis + Comedy Writing ═══════
+    // ═══════ STEP 1: Claude Sonnet 4.5 — Step-by-Step Comedy Writing ═══════
     const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -202,12 +146,8 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",
-        max_tokens: 16000,
-        thinking: {
-          type: "enabled",
-          budget_tokens: 10000,
-        },
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 4096,
         messages: [{
           role: "user",
           content: [
@@ -217,49 +157,60 @@ export default async function handler(req, res) {
             },
             {
               type: "text",
-              text: `You are a PROFESSIONAL ROAST COMEDIAN writing material for a comedy special. This isn't a casual joke — this is your career. Every line needs to LAND.
+              text: `You are a HEADLINING ROAST COMEDIAN. You've been hired to absolutely destroy whoever uploaded this photo. Your reputation depends on every single line being laugh-out-loud funny.
 
-STEP 1 — DEEP IMAGE ANALYSIS (use your thinking to study this):
+IMPORTANT: Follow these steps IN ORDER before writing the final output.
+
+═══ STEP 1: FORENSIC IMAGE ANALYSIS ═══
+Study this image like a detective. Identify:
+- Every piece of text visible (read it ALL word for word)
+- Specific objects, clothing, setting details
+- What the person is clearly trying to project vs. what's actually happening
+- The single most roastable thing in this image
+- Any background details that are unintentionally funny
+- Numbers: follower counts, dates, stats, anything specific
+
 ${categoryPrompt}
 
-Read every visible word. Count followers. Read bios. Note specific details. The SPECIFICITY is what makes roasts funny. "Nice photo" isn't funny. "You spent $200 on a ring light and THIS is the result" is funny.
+═══ STEP 2: FIND THE COMEDY ANGLES ═══
+Based on what you observed, brainstorm 6-8 possible comedy angles. For each one, ask:
+- What's the SETUP? (the observation)
+- What's the PUNCH? (the unexpected twist, comparison, or exaggeration)
+- Is this SPECIFIC to THIS image or could it apply to anyone? (if anyone, discard it)
 
-STEP 2 — WRITE THE ROAST
+Good: "Your headline says 'Disrupting the Future of Synergy' but your background is a Panera Bread"
+Bad: "Nice profile pic" (generic, could be anyone)
+
+═══ STEP 3: WRITE THE FINAL ROAST ═══
 ${stylePrompt}
 
-Write exactly 7 roast annotations. Here's how they'll be used on the image:
-- Annotations 1-2: These go DIRECTLY ON the image as hand-drawn red text. Keep these punchy (under 12 words). These should reference something visually obvious.
-- Annotations 3-7: These go in a WHITE FRAME around the image with arrows pointing to specific things. These can be longer (up to 20 words) and more detailed/funny since they have space.
+From your comedy angles, pick the BEST and write:
 
-Also write:
-- 1 "overall_burn" headline (max 12 words) — goes at the bottom of the frame. This is the TITLE of the roast. Make it devastating.
-- 1 "sketch_idea" — a tiny funny doodle to add to the image (e.g., "thought bubble above their head saying 'I peaked in 2019'", "a trophy labeled 'World's Most Average'", "a Yelp star rating: 2.5 stars"). Keep it simple enough to draw.
+1. ONE "callout" (max 8 words) — goes directly ON the photo with an arrow. Pick the single funniest visual detail. Short, punchy, devastating.
 
-COMEDY RULES:
-- Be SPECIFIC to what you see. Generic = death. Reference exact things in the image.
-- Setup + punchline structure. Don't just describe — make a JOKE.
-- Punch UP on their choices, not DOWN on their appearance.
-- Go harder than you think you should. Milquetoast is worse than too far.
-- Weird, unexpected angles are funnier than obvious ones.
-- If something is genuinely impressive, roast the flex itself.
-- Pop culture references that fit = gold.
-- Each annotation should make someone laugh out loud, not just smirk.
+2. FOUR "frame" jokes (8-15 words each) — go in a white border AROUND the photo. These are your A-material. Each must be a complete joke, not just an observation. Setup + punch in one line.
 
-Return ONLY valid JSON, no markdown, no backticks:
+3. ONE "overall_burn" headline (max 10 words) — the title. The thing people screenshot and share.
+
+4. ONE "sketch_idea" — a tiny doodle for an empty area of the photo. Dead simple (stick figure, speech bubble, star rating, small symbol). Must be funny in context. Examples: a small "2/10", a thought bubble saying something short, a tiny award ribbon.
+
+QUALITY CHECK before outputting:
+- Would each line make a room of comedians laugh? If not, rewrite it.
+- Is every joke SPECIFIC to this exact image? If it could apply to anyone, cut it.
+- Are you roasting choices/behavior (good) or appearance (bad)?
+- Did you go hard enough? Too safe = failure.
+
+Return ONLY this JSON. No markdown, no backticks, no other text:
 {
-  "on_image": [
-    {"text": "...", "location": "specific area of image this points to"},
-    {"text": "...", "location": "specific area"}
+  "callout": {"text": "short punchy line", "points_to": "what the arrow points at"},
+  "frame": [
+    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
+    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
+    {"text": "joke with setup and punch", "points_to": "what arrow points at"},
+    {"text": "joke with setup and punch", "points_to": "what arrow points at"}
   ],
-  "in_frame": [
-    {"text": "...", "location": "what the arrow points to in the image"},
-    {"text": "...", "location": "..."},
-    {"text": "...", "location": "..."},
-    {"text": "...", "location": "..."},
-    {"text": "...", "location": "..."}
-  ],
-  "overall_burn": "devastating headline summary",
-  "sketch_idea": "simple funny doodle description"
+  "overall_burn": "devastating headline",
+  "sketch_idea": "simple doodle description"
 }`,
             },
           ],
@@ -275,7 +226,7 @@ Return ONLY valid JSON, no markdown, no backticks:
 
     const claudeData = await claudeResponse.json();
     
-    // Extract text from response (may have thinking blocks)
+    // Extract text from response
     let claudeText = "";
     for (const block of claudeData.content || []) {
       if (block.type === "text") {
@@ -299,44 +250,48 @@ Return ONLY valid JSON, no markdown, no backticks:
 
     // ═══════ STEP 2: Gemini — Generate Framed Annotated Image ═══════
     
-    // Build annotation instructions for ON the image
-    const onImageAnnotations = (roastData.on_image || [])
-      .map((a, i) => `ON-IMAGE ${i + 1}: Write "${a.text}" with arrow pointing to ${a.location}`)
+    const callout = roastData.callout || {};
+    const calloutInstruction = `Write "${callout.text || ''}" with a wobbly hand-drawn arrow pointing to ${callout.points_to || 'the center of the photo'}`;
+
+    const frameAnnotations = (roastData.frame || [])
+      .map((a, i) => `  ${i + 1}. "${a.text}" with arrow pointing to ${a.points_to}`)
       .join("\n");
 
-    // Build annotation instructions for IN the frame
-    const inFrameAnnotations = (roastData.in_frame || [])
-      .map((a, i) => `FRAME ${i + 1}: Write "${a.text}" with arrow from the white frame pointing into the image at ${a.location}`)
-      .join("\n");
+    const geminiPrompt = `Create a ROAST IMAGE with a wide white frame around the photo and hand-drawn red marker annotations.
 
-    const geminiPrompt = `TASK: Create a roast image with a WHITE FRAME around the original photo, with hand-drawn annotations.
+=== LAYOUT (follow exactly) ===
+- Place the uploaded photo in the CENTER at about 60-65% of the total canvas size
+- Add a WIDE WHITE BORDER on all sides. The border should be about 15-20% of total width on each side, 20% on top and bottom
+- The white border is where MOST text goes. Keep the actual photo mostly clean.
 
-LAYOUT INSTRUCTIONS:
-1. Place the uploaded image in the CENTER, slightly reduced in size (about 70-75% of the total canvas)
-2. Surround it with a WHITE BORDER/FRAME on all sides (like a photo in a white picture frame or matte)
-3. The white frame should be wide enough to write text in — about 15-20% of the image width on each side
+=== ON THE PHOTO (minimal — keep photo clean) ===
+Only two things go on the actual photo:
+1. ${calloutInstruction}
+2. One small simple sketch/doodle in an open empty area: ${roastData.sketch_idea || "a small funny doodle"}. Keep it tiny — like a quick 2-second pen scribble.
 
-ANNOTATIONS ON THE IMAGE (red marker, hand-drawn style):
-${onImageAnnotations}
+=== IN THE WHITE FRAME (this is where the main jokes go) ===
+Write these in the white border, spread around the photo (top, sides, bottom). Draw hand-drawn arrows from each annotation pointing INTO the photo:
+${frameAnnotations}
 
-ANNOTATIONS IN THE WHITE FRAME (written in the white border area, with arrows pointing into the image):
-${inFrameAnnotations}
+=== BOTTOM OF FRAME ===
+Write bigger: "${roastData.overall_burn || ''}"
+Bottom-right corner, small: "roastdai.com"
 
-SKETCH/DOODLE (small, funny, hand-drawn):
-${roastData.sketch_idea || "a small funny doodle"}
+=== HANDWRITING STYLE (most important requirement) ===
+EVERY piece of text must look like someone grabbed a RED SHARPIE MARKER and scrawled on a printed photo:
+- Uneven, wobbly, tilted letters of different sizes
+- Messy but readable — like real human handwriting, not calligraphy
+- Arrows are wobbly curved lines, NOT straight
+- Circle or underline one thing on the photo
+- The headline at bottom is slightly bigger but still handwritten
+- ABSOLUTELY NO computer fonts, printed text, or typed-looking text anywhere
+- Think "drunk friend with a red marker attacking a printed photo at 2am"
 
-BOTTOM OF FRAME:
-Write the headline: "${roastData.overall_burn}" in larger hand-drawn text at the bottom of the white frame.
-In the bottom-right corner of the white frame, write "roastdai.com" in small neat text.
-
-STYLE REQUIREMENTS:
-- ALL text must be hand-drawn red marker/sharpie style (NOT computer font)
-- Slightly messy, tilted, varying sizes — like someone actually scribbled on a printed photo
-- Arrows should be hand-drawn, not straight
-- Circle or underline 1-2 things on the actual image
-- The white frame should be CLEAN white — text and arrows only
-- Keep the original image fully visible and clear
-- The sketch/doodle should be simple and small`;
+=== DO NOT ===
+- Do NOT plaster text all over the photo — only the one callout + tiny sketch on the photo itself
+- Do NOT use any computer/digital/printed fonts
+- Do NOT make arrows straight or perfect
+- Do NOT put text in boxes, bubbles, or banners`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
