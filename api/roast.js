@@ -160,50 +160,50 @@ export default async function handler(req, res) {
               type: "text",
               text: `You write roasts for the internet. Not corporate comedy. Not "ha that's clever." The kind of shit people screenshot and send to group chats. The kind that makes someone go "OH NO" and then laugh for 10 seconds.
 
-FIRST: Study this image carefully. Read every word. Note every detail. The specifics are everything.
+STEP 1 — LOOK AT THIS IMAGE AND LIST EVERYTHING YOU SEE:
+Read every word of text. Note every number. Describe what the person is wearing, doing, where they are. What are they trying to project? What does the background reveal? What details did they NOT realize were visible? Write this list in your head before doing anything else.
 
 ${categoryPrompt}
 
-HERE'S WHAT MAKES A ROAST FUNNY VS. GENERIC:
+STEP 2 — FIND THE FUNNIEST ANGLES:
+For each detail you noticed, ask: "What's the meanest, funniest thing I could say about this?" The best roasts take something the person is PROUD of and flip it into something embarrassing.
 
-FUNNY: "59k followers watching a man use LinkedIn like a dating app"
-GENERIC: "wow so many followers lol"
-WHY: The funny version takes a real detail (59k) and reframes it in an unexpected way.
+THE FORMULA: [specific detail from the image] + [unexpected reframe that makes it embarrassing/devastating]
 
-FUNNY: "'View my newsletter' button doing more work than the entire company"  
-GENERIC: "he has a newsletter button that's cringe"
-WHY: The funny version personifies the button and makes a comparison that stings.
+EXAMPLES OF ACTUALLY FUNNY ROASTS:
+- "59k followers and every single one is watching you fumble this"
+- "'View my newsletter' is doing more work than whatever beehiiv does"
+- "Paid for LinkedIn Premium like that's gonna fix the headshot"
+- "178 mutual connections and not one of them would hire you"
+- "University of Maryland on the profile like that's the flex you think it is"
+- "That astronaut meme as your banner tells me everything about your marketing budget"
 
-FUNNY: "Paid for Premium so LinkedIn would stop suggesting real jobs"
-GENERIC: "he paid for premium lol"
-WHY: The funny version implies something devastating about the person through the detail.
+EXAMPLES OF UNFUNNY GARBAGE (do NOT write like this):
+- "Interesting profile!" (not a joke)
+- "Cofounder/CEO is giving unemployed" (barely English, no punchline)
+- "59,600 followers watching someone cosplay" (too wordy, no punch)
+- "Slowly run out of runway mate" (vague, not specific enough)
+- Any sentence that just DESCRIBES what you see without adding a twist
 
-THE PATTERN: Take a specific detail you can see → reframe it in a way that's mean, surprising, or reveals something embarrassing they didn't intend to show.
-
-WHAT TO AVOID:
-- Just describing what you see ("nice headshot", "interesting bio") — that's not a joke
-- Vague insults that could apply to anyone ("cringe profile", "trying too hard")
-- Repeating the same angle twice
-- Being clever instead of funny — nobody cares about wordplay, they want to LAUGH
-- Obscure references or fancy vocabulary — write like a funny person texts
-
-NOW WRITE THE ROAST:
+STEP 3 — WRITE THE FINAL ROAST:
 ${stylePrompt}
 
-Return exactly this JSON structure. No markdown, no backticks, no explanation before or after:
+IMPORTANT: Stay in character but make sure every joke still makes grammatical sense and is easy to understand. If a joke requires explanation, it's bad. Kill it.
+
+Return exactly this JSON. No markdown, no backticks, nothing else:
 {
-  "callout": {"text": "MAX 8 WORDS — the single funniest visual detail, short and brutal", "points_to": "what the arrow should point at in the image"},
+  "callout": {"text": "MAX 8 WORDS — short devastating one-liner for ON the photo", "points_to": "what the arrow points at"},
   "frame": [
-    {"text": "8-15 word joke — must have a punchline, not just an observation", "points_to": "what to point at"},
-    {"text": "different angle, different joke, still specific to this image", "points_to": "what to point at"},
-    {"text": "the one that makes people say OH NO", "points_to": "what to point at"},
-    {"text": "your closer — leave them dead", "points_to": "what to point at"}
+    {"text": "8-15 word joke with a real punchline", "points_to": "what to point at"},
+    {"text": "completely different angle from joke 1", "points_to": "what to point at"},
+    {"text": "the meanest one — make them feel it", "points_to": "what to point at"},
+    {"text": "your closer — the one they remember", "points_to": "what to point at"}
   ],
-  "overall_burn": "max 10 words — the headline people share. Make it devastating.",
-  "sketch_idea": "tiny simple doodle idea for an empty area — a price tag, a rating, a thought bubble, something dead simple and contextually funny"
+  "overall_burn": "max 10 words — devastating headline. The thing people screenshot.",
+  "sketch_idea": "tiny doodle for the photo — a price tag, star rating, small speech bubble, trophy, etc. Must be contextually funny and dead simple to draw"
 }
 
-FINAL CHECK: Read each joke back. If your reaction is "that's fine" instead of "oh SHIT" — rewrite it. Every line should hit.`,
+BEFORE YOU OUTPUT: Read every joke. Is it actually funny or just a description with attitude? If you're not sure, it's not funny. Rewrite it until it hits.`,
             },
           ],
         }],
@@ -274,32 +274,41 @@ FINAL CHECK: Read each joke back. If your reaction is "that's fine" instead of "
       .map((a, i) => `  ${i + 1}. "${a.text}" — draw an arrow from this text into the photo pointing at ${a.points_to}`)
       .join("\n");
 
-    const geminiPrompt = `This image shows a photo centered on a large white background. Write funny roast annotations on it using red marker handwriting.
+    const geminiPrompt = `This image shows a photo centered on a large white background. Your job: annotate it like someone printed this photo and went at it with a red Sharpie while laughing.
 
-THE PHOTO is the image in the center. THE WHITE SPACE is the large white area surrounding it on all sides.
+THE PHOTO = the image in the center.
+THE WHITE SPACE = the wide white border around the photo.
 
-=== ON THE PHOTO (keep it clean — only these 3 things) ===
-1. Write "${callout.text || ''}" in red handwriting with a thick white outline around each letter. Draw a wobbly arrow pointing to ${callout.points_to || 'the center'}.
-2. Draw one tiny doodle in an open area: ${roastData.sketch_idea || "a small funny doodle"}.
-3. Circle one funny detail.
-Nothing else on the photo.
+=== THINGS THAT GO ON THE PHOTO ITSELF ===
+Do these directly on top of the photo:
+1. Write "${callout.text || ''}" in MESSY red marker handwriting. Add a thick white outline/shadow behind each letter so it pops against any background color. Draw a sloppy curved arrow pointing to ${callout.points_to || 'the most obvious thing'}.
+2. Draw a small funny sketch/doodle in an open area of the photo: ${roastData.sketch_idea || "a small funny doodle"}. Red ink, white outline. Keep it small but visible — like a quick Sharpie scribble.
+3. Circle or underline one thing on the photo that's funny.
+These three things MUST appear on the actual photo, not in the white space.
 
-=== IN THE WHITE SPACE (all main text goes here) ===
-Write these jokes ONLY in the white area around the photo. Spread them out on all sides. Draw wobbly arrows from each one pointing into the photo:
+=== THINGS THAT GO IN THE WHITE SPACE ===
+Write these jokes in the white border around the photo. Spread them evenly — 1-2 on the left side, 1-2 on the right side, 1 near the top. Draw messy curved arrows from each joke into the photo:
 ${frameAnnotations}
 
-=== AT THE BOTTOM OF THE WHITE SPACE ===
-Write in bigger letters: "${roastData.overall_burn || ''}"
+=== BOTTOM OF WHITE SPACE ===
+Write the headline in bigger messy letters: "${roastData.overall_burn || ''}"
 
-=== STYLE ===
-- ALL text = red Sharpie handwriting. Wobbly, uneven, tilted letters. Like a real person scrawling.
-- On the photo: red with white outline around letters so it's readable on any color.
-- In the white space: plain red (no outline needed).
-- Arrows = wobbly curves, never straight.
-- NEVER use computer fonts or printed text.
-- NEVER stamp or write anything across the center of the photo.
-- NEVER add any watermarks, logos, or website names.
-- ONLY use red color for all text and arrows.`;
+=== HANDWRITING STYLE (critical) ===
+Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Think:
+- A drunk person scrawling with a fat red Sharpie
+- Letters different sizes, some tilted left, some tilted right
+- Words not perfectly straight — they drift up or down
+- Some letters connected, some not
+- Arrows are wobbly curved lines that look hand-drawn
+- Circles are imperfect ovals
+- It should look HUMAN and MESSY, not like a handwriting font
+
+=== BANNED (do not do any of these) ===
+- Do NOT write "roastdai" or "roastdai.com" or any website URL anywhere
+- Do NOT add any watermarks, stamps, or logos anywhere on the image
+- Do NOT use computer fonts, printed text, or neat handwriting
+- Do NOT use any color besides red for text and arrows
+- Do NOT make arrows straight`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
@@ -354,10 +363,16 @@ Write in bigger letters: "${roastData.overall_burn || ''}"
       const resultMeta = await sharp(resultBuffer).metadata();
       const rW = resultMeta.width || 800;
       const rH = resultMeta.height || 800;
-      const fontSize = Math.max(14, Math.round(rW * 0.02));
+      const fontSize = Math.max(16, Math.round(rW * 0.025));
+      const padding = Math.round(fontSize * 0.8);
       
+      // Create a small image with the watermark text using SVG with embedded font
       const svgWatermark = Buffer.from(`<svg width="${rW}" height="${rH}" xmlns="http://www.w3.org/2000/svg">
-        <text x="${rW - 15}" y="${rH - 15}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.8">roastdai.com</text>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand');
+          .wm { font-family: 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif; }
+        </style>
+        <text x="${rW - padding}" y="${rH - padding}" class="wm" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.6" font-style="italic">roastdai.com</text>
       </svg>`);
       
       const watermarkedBuffer = await sharp(resultBuffer)
