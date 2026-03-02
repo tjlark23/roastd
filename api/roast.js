@@ -179,11 +179,11 @@ EXAMPLES OF ACTUALLY FUNNY ROASTS:
 - "That astronaut meme as your banner tells me everything about your marketing budget"
 
 EXAMPLES OF UNFUNNY GARBAGE (do NOT write like this):
-- "Interesting profile!" (not a joke)
-- "Cofounder/CEO is giving unemployed" (barely English, no punchline)
-- "59,600 followers watching someone cosplay" (too wordy, no punch)
-- "Slowly run out of runway mate" (vague, not specific enough)
-- Any sentence that just DESCRIBES what you see without adding a twist
+- "Interesting profile!" (not a joke, just a comment)
+- "59k followers watching you explain newsletters" (this is just a DESCRIPTION with attitude — there's no twist, no punchline, no surprise. SAYING WHAT YOU SEE IS NOT A JOKE.)
+- "Cofounder is giving unemployed" (barely English, no punchline, too vague)
+- "Nice headshot bro" (who cares? where's the joke?)
+- Any sentence that just describes what's in the image but in a snarky tone — that's NOT comedy, that's just being snarky. A JOKE needs an unexpected connection, comparison, or reframe that the reader didn't see coming.
 
 STEP 3 — WRITE THE FINAL ROAST:
 ${stylePrompt}
@@ -355,36 +355,6 @@ Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Thi
 
     if (!generatedImageBase64) {
       return res.status(500).json({ error: "No image in response. Try again." });
-    }
-
-    // Add roastdai.com watermark via code (bottom-right corner)
-    try {
-      const resultBuffer = Buffer.from(generatedImageBase64, 'base64');
-      const resultMeta = await sharp(resultBuffer).metadata();
-      const rW = resultMeta.width || 800;
-      const rH = resultMeta.height || 800;
-      const fontSize = Math.max(16, Math.round(rW * 0.025));
-      const padding = Math.round(fontSize * 0.8);
-      
-      // Create a small image with the watermark text using SVG with embedded font
-      const svgWatermark = Buffer.from(`<svg width="${rW}" height="${rH}" xmlns="http://www.w3.org/2000/svg">
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand');
-          .wm { font-family: 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif; }
-        </style>
-        <text x="${rW - padding}" y="${rH - padding}" class="wm" font-size="${fontSize}" fill="#cc0000" text-anchor="end" opacity="0.6" font-style="italic">roastdai.com</text>
-      </svg>`);
-      
-      const watermarkedBuffer = await sharp(resultBuffer)
-        .composite([{ input: svgWatermark, top: 0, left: 0 }])
-        .png()
-        .toBuffer();
-      
-      generatedImageBase64 = watermarkedBuffer.toString('base64');
-      generatedMimeType = 'image/png';
-    } catch (wmErr) {
-      console.error("Watermark error (non-fatal):", wmErr.message);
-      // Continue without watermark if it fails
     }
 
     return res.status(200).json({
