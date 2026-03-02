@@ -315,7 +315,7 @@ Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Thi
 - Do NOT make arrows straight`;
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
