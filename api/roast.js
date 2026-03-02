@@ -199,6 +199,9 @@ QUALITY CHECK before outputting:
 - Is every joke SPECIFIC to this exact image? If it could apply to anyone, cut it.
 - Are you roasting choices/behavior (good) or appearance (bad)?
 - Did you go hard enough? Too safe = failure.
+- NEVER repeat the same joke, reference, or word across multiple annotations. Every line must be a completely different angle.
+- Use simple words everyone knows. No niche/obscure vocabulary. Write at a 7th grade reading level. If your mom wouldn't get the joke, rewrite it.
+- The callout text is MAX 8 words. Count them. If it's over 8, shorten it.
 
 Return ONLY this JSON. No markdown, no backticks, no other text:
 {
@@ -257,41 +260,53 @@ Return ONLY this JSON. No markdown, no backticks, no other text:
       .map((a, i) => `  ${i + 1}. "${a.text}" with arrow pointing to ${a.points_to}`)
       .join("\n");
 
-    const geminiPrompt = `Create a ROAST IMAGE with a wide white frame around the photo and hand-drawn red marker annotations.
+    const geminiPrompt = `You are creating a funny roast image. Follow these instructions EXACTLY.
 
-=== LAYOUT (follow exactly) ===
-- Place the uploaded photo in the CENTER at about 60-65% of the total canvas size
-- Add a WIDE WHITE BORDER on all sides. The border should be about 15-20% of total width on each side, 20% on top and bottom
-- The white border is where MOST text goes. Keep the actual photo mostly clean.
+=== CANVAS LAYOUT (critical — get this right first) ===
+Create a large canvas. The uploaded photo goes in the CENTER and should be SMALL relative to the total canvas — only about 45-50% of the total area. Surround the photo with a VERY WIDE pure white border:
+- Left border: 25% of total canvas width
+- Right border: 25% of total canvas width  
+- Top border: 15% of total canvas height
+- Bottom border: 20% of total canvas height (extra room for the headline)
 
-=== ON THE PHOTO (minimal — keep photo clean) ===
-Only two things go on the actual photo:
-1. ${calloutInstruction}
-2. One small simple sketch/doodle in an open empty area: ${roastData.sketch_idea || "a small funny doodle"}. Keep it tiny — like a quick 2-second pen scribble.
+The photo should look like a printed photo sitting on a big white desk/poster with tons of white space around it for writing.
 
-=== IN THE WHITE FRAME (this is where the main jokes go) ===
-Write these in the white border, spread around the photo (top, sides, bottom). Draw hand-drawn arrows from each annotation pointing INTO the photo:
+=== ZONE 1: ON THE PHOTO (very minimal) ===
+Only these things go on the actual photo itself:
+1. ${calloutInstruction} — use RED text with a THICK WHITE OUTLINE around every letter so it's readable on any background color. The white outline should be visible and make the red text pop against any image color.
+2. One tiny simple sketch/doodle in an open area: ${roastData.sketch_idea || "a small funny doodle"}. Red ink with white outline. Keep it very small.
+3. One circle or underline around something funny.
+
+That's IT on the photo. Nothing else. Keep the photo clean.
+
+=== ZONE 2: IN THE WHITE BORDER (this is where the main jokes go) ===
+ALL of these annotations go ENTIRELY within the white border area. Do NOT let any of this text overlap onto the photo. The text stays in the white space, and only the arrows cross into the photo to point at things:
 ${frameAnnotations}
 
-=== BOTTOM OF FRAME ===
-Write bigger: "${roastData.overall_burn || ''}"
-Bottom-right corner, small: "roastdai.com"
+Spread them around: 1-2 on the left side, 1-2 on the right side, and maybe one on top. Each one has a hand-drawn arrow that reaches from the text in the white border INTO the photo pointing at the target.
 
-=== HANDWRITING STYLE (most important requirement) ===
-EVERY piece of text must look like someone grabbed a RED SHARPIE MARKER and scrawled on a printed photo:
-- Uneven, wobbly, tilted letters of different sizes
-- Messy but readable — like real human handwriting, not calligraphy
-- Arrows are wobbly curved lines, NOT straight
-- Circle or underline one thing on the photo
-- The headline at bottom is slightly bigger but still handwritten
-- ABSOLUTELY NO computer fonts, printed text, or typed-looking text anywhere
-- Think "drunk friend with a red marker attacking a printed photo at 2am"
+=== ZONE 3: BOTTOM OF WHITE BORDER ===
+In the bottom white border area, write bigger: "${roastData.overall_burn || ''}"
+In the bottom-right corner, write small: "roastdai.com"
 
-=== DO NOT ===
-- Do NOT plaster text all over the photo — only the one callout + tiny sketch on the photo itself
-- Do NOT use any computer/digital/printed fonts
-- Do NOT make arrows straight or perfect
-- Do NOT put text in boxes, bubbles, or banners`;
+=== TEXT STYLE (follow strictly) ===
+ALL text everywhere must look like authentic RED SHARPIE HANDWRITING on paper:
+- Every letter slightly different size, slightly tilted, slightly wobbly
+- Natural handwriting imperfections — some letters bigger, some smaller, not on a straight line
+- Like a real person actually scrawled this with a marker, not like a computer handwriting font
+- Arrows are curved wobbly hand-drawn lines, never straight
+- For text ON the photo: red handwriting with a visible WHITE OUTLINE/STROKE around each letter (so it reads on any background)
+- For text IN the white border: plain red handwriting (no outline needed since it's on white)
+- NEVER use any computer font, typed text, or digital-looking text. If it looks printed, you've failed.
+
+=== ABSOLUTE RULES ===
+- The white border must be VERY WIDE — at least 25% of canvas width on left and right
+- Text in the white border must stay ENTIRELY in the white border, not creep onto the photo
+- Only the arrows cross from the white border onto the photo
+- The photo should look relatively clean with minimal writing on it
+- Do NOT use any computer/printed/digital fonts anywhere
+- Do NOT make arrows perfectly straight
+- Do NOT put text in boxes, speech bubbles, or banners`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
