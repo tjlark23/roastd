@@ -170,13 +170,16 @@ For each detail you noticed, ask: "What's the meanest, funniest thing I could sa
 
 THE FORMULA: [specific detail from the image] + [unexpected reframe that makes it embarrassing/devastating]
 
-EXAMPLES OF ACTUALLY FUNNY ROASTS:
-- "59k followers and every single one is watching you fumble this"
-- "'View my newsletter' is doing more work than whatever beehiiv does"
-- "Paid for LinkedIn Premium like that's gonna fix the headshot"
-- "178 mutual connections and not one of them would hire you"
-- "University of Maryland on the profile like that's the flex you think it is"
-- "That astronaut meme as your banner tells me everything about your marketing budget"
+EXAMPLES OF ACTUALLY FUNNY ROASTS (notice how each one takes a SPECIFIC detail and TWISTS it):
+- Detail: person has 59k followers → Twist: "59k people subscribed to watch a man lose money in public"
+- Detail: banner shows astronauts → Twist: "even the astronaut in your banner is trying to escape this profile"
+- Detail: Premium badge visible → Twist: "Paid for Premium because the free version wasn't embarrassing enough"
+- Detail: University of Maryland listed → Twist: "Maryland on the resume doing heavy lifting for a company nobody's heard of"
+- Detail: 178 mutual connections → Twist: "178 people know you personally and still won't share your posts"
+
+Notice the pattern: DETAIL + UNEXPECTED REFRAME that reveals something the person didn't mean to show. Every joke needs that twist. If you remove the twist and it still makes sense, it's not a joke.
+
+ALSO: Do NOT reuse these example jokes. They're here to show the PATTERN. Write completely original material based on what you actually see.
 
 EXAMPLES OF UNFUNNY GARBAGE (do NOT write like this):
 - "Interesting profile!" (not a joke, just a comment)
@@ -304,8 +307,9 @@ Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Thi
 - It should look HUMAN and MESSY, not like a handwriting font
 
 === BANNED (do not do any of these) ===
-- Do NOT write "roastdai" or "roastdai.com" or any website URL anywhere
-- Do NOT add any watermarks, stamps, or logos anywhere on the image
+- Do NOT write any website URLs, domain names, or web addresses anywhere on the image
+- Do NOT add any watermarks, stamps, logos, or branding text anywhere
+- Do NOT write any text diagonally across the photo
 - Do NOT use computer fonts, printed text, or neat handwriting
 - Do NOT use any color besides red for text and arrows
 - Do NOT make arrows straight`;
