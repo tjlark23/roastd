@@ -251,62 +251,69 @@ Return ONLY this JSON. No markdown, no backticks, no other text:
       return res.status(500).json({ error: "Claude was too brutal to be contained. Try again." });
     }
 
-    // ═══════ STEP 2: Gemini — Generate Framed Annotated Image ═══════
+    // ═══════ STEP 2: Build white frame around photo using Sharp ═══════
+    const sharp = (await import('sharp')).default;
+    
+    // Decode the uploaded image
+    const imgBuffer = Buffer.from(image, 'base64');
+    const imgMeta = await sharp(imgBuffer).metadata();
+    const imgW = imgMeta.width;
+    const imgH = imgMeta.height;
+    
+    // Add 25% padding on ALL sides (equal spacing)
+    const padX = Math.round(imgW * 0.25);
+    const padY = Math.round(imgH * 0.25);
+    const canvasW = imgW + padX * 2;
+    const canvasH = imgH + padY * 2;
+    
+    // Create white canvas with photo centered
+    const framedBuffer = await sharp({
+      create: { width: canvasW, height: canvasH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+    })
+    .composite([{ input: imgBuffer, left: padX, top: padY }])
+    .png()
+    .toBuffer();
+    
+    const framedBase64 = framedBuffer.toString('base64');
+
+    // ═══════ STEP 3: Gemini — Write annotations on the pre-framed image ═══════
     
     const callout = roastData.callout || {};
-    const calloutInstruction = `Write "${callout.text || ''}" with a wobbly hand-drawn arrow pointing to ${callout.points_to || 'the center of the photo'}`;
-
+    
     const frameAnnotations = (roastData.frame || [])
-      .map((a, i) => `  ${i + 1}. "${a.text}" with arrow pointing to ${a.points_to}`)
+      .map((a, i) => `  ${i + 1}. "${a.text}" — draw an arrow from this text into the photo pointing at ${a.points_to}`)
       .join("\n");
 
-    const geminiPrompt = `You are creating a funny roast image. Follow these instructions EXACTLY.
+    const geminiPrompt = `This image is a photo with a wide white border around it. Your job is to write funny roast annotations on it using red marker handwriting.
 
-=== CANVAS LAYOUT (critical — get this right first) ===
-Create a large canvas. The uploaded photo goes in the CENTER and should be SMALL relative to the total canvas — only about 45-50% of the total area. Surround the photo with a VERY WIDE pure white border:
-- Left border: 25% of total canvas width
-- Right border: 25% of total canvas width  
-- Top border: 15% of total canvas height
-- Bottom border: 20% of total canvas height (extra room for the headline)
+THE IMAGE HAS TWO ZONES:
+- THE PHOTO (the image in the center)
+- THE WHITE BORDER (the wide white space surrounding the photo on all four sides)
 
-The photo should look like a printed photo sitting on a big white desk/poster with tons of white space around it for writing.
+=== WRITE ON THE PHOTO (25% of content — keep it minimal) ===
+1. Write "${callout.text || ''}" in red handwriting with a white outline around each letter (so it's readable on any color). Draw a hand-drawn arrow pointing to ${callout.points_to || 'the most obvious thing'}.
+2. Draw one tiny simple doodle in an open area of the photo: ${roastData.sketch_idea || "a small funny doodle"}. Keep it tiny.
+3. Circle or underline one funny detail.
+That is ALL that goes on the photo. Keep it clean.
 
-=== ZONE 1: ON THE PHOTO (very minimal) ===
-Only these things go on the actual photo itself:
-1. ${calloutInstruction} — use RED text with a THICK WHITE OUTLINE around every letter so it's readable on any background color. The white outline should be visible and make the red text pop against any image color.
-2. One tiny simple sketch/doodle in an open area: ${roastData.sketch_idea || "a small funny doodle"}. Red ink with white outline. Keep it very small.
-3. One circle or underline around something funny.
-
-That's IT on the photo. Nothing else. Keep the photo clean.
-
-=== ZONE 2: IN THE WHITE BORDER (this is where the main jokes go) ===
-ALL of these annotations go ENTIRELY within the white border area. Do NOT let any of this text overlap onto the photo. The text stays in the white space, and only the arrows cross into the photo to point at things:
+=== WRITE IN THE WHITE BORDER (75% of content) ===
+Write these jokes in the white border space around the photo. Spread them out — some on left, some on right, one on top. Draw hand-drawn arrows from each one pointing into the photo:
 ${frameAnnotations}
 
-Spread them around: 1-2 on the left side, 1-2 on the right side, and maybe one on top. Each one has a hand-drawn arrow that reaches from the text in the white border INTO the photo pointing at the target.
+IMPORTANT: This text goes ONLY in the white space. Do NOT write any of these on top of the photo. Only the arrows cross into the photo.
 
-=== ZONE 3: BOTTOM OF WHITE BORDER ===
-In the bottom white border area, write bigger: "${roastData.overall_burn || ''}"
-In the bottom-right corner, write small: "roastdai.com"
+=== BOTTOM OF WHITE BORDER ===
+Write in bigger text: "${roastData.overall_burn || ''}"
+Bottom-right corner, small: "roastdai.com"
 
-=== TEXT STYLE (follow strictly) ===
-ALL text everywhere must look like authentic RED SHARPIE HANDWRITING on paper:
-- Every letter slightly different size, slightly tilted, slightly wobbly
-- Natural handwriting imperfections — some letters bigger, some smaller, not on a straight line
-- Like a real person actually scrawled this with a marker, not like a computer handwriting font
-- Arrows are curved wobbly hand-drawn lines, never straight
-- For text ON the photo: red handwriting with a visible WHITE OUTLINE/STROKE around each letter (so it reads on any background)
-- For text IN the white border: plain red handwriting (no outline needed since it's on white)
-- NEVER use any computer font, typed text, or digital-looking text. If it looks printed, you've failed.
-
-=== ABSOLUTE RULES ===
-- The white border must be VERY WIDE — at least 25% of canvas width on left and right
-- Text in the white border must stay ENTIRELY in the white border, not creep onto the photo
-- Only the arrows cross from the white border onto the photo
-- The photo should look relatively clean with minimal writing on it
-- Do NOT use any computer/printed/digital fonts anywhere
-- Do NOT make arrows perfectly straight
-- Do NOT put text in boxes, speech bubbles, or banners`;
+=== HANDWRITING RULES ===
+- ALL text must look like real RED SHARPIE handwriting — wobbly, uneven, tilted, different letter sizes
+- On the photo: red text with visible WHITE OUTLINE so it pops against any background
+- In the white border: plain red text (no outline needed on white)  
+- Arrows are wobbly hand-drawn curves, never straight lines
+- NEVER use computer fonts, printed text, or typed-looking text anywhere
+- Do NOT write any watermarks or stamps across the photo
+- Do NOT use any colors besides red for text`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
@@ -316,7 +323,7 @@ ALL text everywhere must look like authentic RED SHARPIE HANDWRITING on paper:
         body: JSON.stringify({
           contents: [{
             parts: [
-              { inline_data: { mime_type: mimeType || "image/png", data: image } },
+              { inline_data: { mime_type: "image/png", data: framedBase64 } },
               { text: geminiPrompt },
             ],
           }],

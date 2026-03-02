@@ -1,8 +1,9 @@
 {
   "name": "roastd-ai",
-  "version": "2.0.0",
+  "version": "4.2.0",
   "private": true,
   "dependencies": {
+    "sharp": "^0.33.2",
     "stripe": "^17.5.0"
   }
 }
