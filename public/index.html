@@ -708,6 +708,145 @@
         .credits-badge .credits-dot.low { background: var(--accent); }
         .credits-badge .credits-dot.empty { background: var(--accent-red); }
 
+        /* ═══════ TJ LARKIN FOOTER ═══════ */
+        .tj-footer {
+            width: 100%;
+            background: #000;
+            border-top: 2px solid #ff4d00;
+            font-family: 'IBM Plex Mono', monospace;
+            margin-top: 80px;
+        }
+        .tj-footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 48px 24px 32px;
+        }
+        .tj-footer-top {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 32px;
+            align-items: start;
+            margin-bottom: 40px;
+        }
+        .tj-footer-photo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .tj-footer-bio { padding-top: 4px; }
+        .tj-footer-label {
+            font-size: 9px;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #ff4d00;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .tj-footer-name {
+            font-family: 'DM Serif Display', serif;
+            font-size: 26px;
+            color: #fff;
+            margin-bottom: 4px;
+            line-height: 1.1;
+        }
+        .tj-footer-tagline {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+            max-width: 380px;
+        }
+        .tj-footer-tagline strong { color: #bbb; font-weight: 500; }
+        .tj-footer-links {
+            display: flex;
+            gap: 48px;
+            padding-top: 4px;
+        }
+        .tj-link-group h4 {
+            font-size: 9px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .tj-link-group a {
+            display: block;
+            font-size: 12px;
+            color: #ccc;
+            text-decoration: none;
+            padding: 3px 0;
+            border-left: 2px solid transparent;
+            padding-left: 8px;
+            transition: all 0.15s ease;
+        }
+        .tj-link-group a:hover {
+            color: #ff4d00;
+            border-left-color: #ff4d00;
+        }
+        .tj-footer-divider {
+            height: 1px;
+            background: linear-gradient(to right, #ff4d00, transparent 60%);
+            margin-bottom: 24px;
+        }
+        .tj-footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+        }
+        .tj-footer-projects {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .tj-project-tag {
+            font-size: 10px;
+            color: #666;
+            border: 1px solid #333;
+            border-radius: 2px;
+            padding: 4px 10px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .tj-project-tag:hover {
+            color: #ff4d00;
+            border-color: #ff4d00;
+        }
+        .tj-project-tag .tag-emoji { margin-right: 4px; }
+        .tj-footer-social {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .tj-social-link {
+            font-size: 11px;
+            color: #555;
+            text-decoration: none;
+            transition: color 0.15s ease;
+            font-weight: 500;
+        }
+        .tj-social-link:hover { color: #fff; }
+        .tj-footer-copy {
+            font-size: 10px;
+            color: #333;
+            text-align: center;
+            padding-top: 24px;
+            letter-spacing: 0.5px;
+        }
+        @media (max-width: 768px) {
+            .tj-footer-top { grid-template-columns: 1fr; gap: 20px; }
+            .tj-footer-photo { width: 60px; height: 60px; }
+            .tj-footer-links { gap: 32px; }
+            .tj-footer-bottom { flex-direction: column; align-items: flex-start; gap: 16px; }
+        }
+        @media (max-width: 480px) {
+            .tj-footer-inner { padding: 32px 16px 24px; }
+            .tj-footer-name { font-size: 22px; }
+            .tj-footer-links { flex-direction: column; gap: 20px; }
+        }
+
     </style>
 </head>
 <body>
@@ -1189,5 +1328,56 @@
         // Init
         handleStripeReturn().then(() => render());
     </script>
+    <footer class="tj-footer">
+        <div class="tj-footer-inner">
+            <div class="tj-footer-top">
+                <div style="display: flex; gap: 16px; align-items: start;">
+                    <img src="/tj-headshot.png" alt="TJ Larkin" class="tj-footer-photo">
+                    <div class="tj-footer-bio">
+                        <div class="tj-footer-label">Made by</div>
+                        <div class="tj-footer-name">TJ Larkin</div>
+                        <div class="tj-footer-tagline">Building the future of <strong>local media</strong> with AI. Newsletter operator, software builder, and creator of fun internet things.</div>
+                    </div>
+                </div>
+                <div class="tj-footer-links">
+                    <div class="tj-link-group">
+                        <h4>The Real Stuff</h4>
+                        <a href="https://tjlarkin.com" target="_blank">tjlarkin.com</a>
+                        <a href="https://lightbreak.ai" target="_blank">lightbreak</a>
+                        <a href="https://localmediahq.com" target="_blank">Local Media HQ</a>
+                        <a href="https://wilcoguide.com" target="_blank">WilCo Guide</a>
+                    </div>
+                    <div class="tj-link-group">
+                        <h4>Connect</h4>
+                        <a href="https://x.com/tjlarkin23" target="_blank">X / Twitter</a>
+                        <a href="https://linkedin.com/in/tjlarkin" target="_blank">LinkedIn</a>
+                        <a href="https://youtube.com/@tjlarkin" target="_blank">YouTube</a>
+                    </div>
+                </div>
+            </div>
+            <div class="tj-footer-divider"></div>
+            <div class="tj-footer-bottom">
+                <div>
+                    <div style="font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #555; margin-bottom: 8px; font-weight: 600;">Other Fun Things I've Built</div>
+                    <div class="tj-footer-projects">
+                        <a href="https://roastdai.com" class="tj-project-tag"><span class="tag-emoji">&#128293;</span>Roastd AI</a>
+                        <a href="https://simulationvibe.com" class="tj-project-tag"><span class="tag-emoji">&#127744;</span>Simulation Vibe</a>
+                        <a href="https://comradebot.com" class="tj-project-tag"><span class="tag-emoji">&#129302;</span>Comrade Bot</a>
+                        <a href="https://songsforyourstory.com" class="tj-project-tag"><span class="tag-emoji">&#127925;</span>Songs For Your Story</a>
+                        <a href="https://mindsetjukebox.com" class="tj-project-tag"><span class="tag-emoji">&#129504;</span>Mindset Jukebox</a>
+                    </div>
+                </div>
+                <div class="tj-footer-social">
+                    <a href="https://x.com/tjlarkin23" target="_blank" class="tj-social-link">X</a>
+                    <span style="color: #333;">&middot;</span>
+                    <a href="https://linkedin.com/in/tjlarkin" target="_blank" class="tj-social-link">LI</a>
+                    <span style="color: #333;">&middot;</span>
+                    <a href="https://youtube.com/@tjlarkin" target="_blank" class="tj-social-link">YT</a>
+                </div>
+            </div>
+            <div class="tj-footer-copy">&copy; 2026 TJ Larkin. Liberty Hill, Texas.</div>
+        </div>
+    </footer>
+
 </body>
 </html>
