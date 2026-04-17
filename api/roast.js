@@ -290,14 +290,26 @@ Pay extra attention to frame jokes 1 and 4 — those are the ones people remembe
 ════════ ABSOLUTE BANS — read these FIRST ════════
 Violating any of these ruins the image. Apply these filters to everything you draw.
 
-1. NO URLs, domains, or web addresses. Not ".com", not "www.", not "roastd", not any website name. None. Anywhere. Not in the corner, not as a watermark, not hidden in a joke.
-2. NO watermarks, signatures, logos, stamps, brand marks, copyright notices, or "signed by" marks. If any part of you wants to "sign" this image — don't.
+1. NO URLs, domains, or web addresses ANYWHERE on the image EXCEPT the one required branding line in the bottom-right corner (see BRANDING section below). No ".com" anywhere else. No website name anywhere else. No URL hidden inside a joke, written diagonally across the photo, stamped over the photo, or placed in any corner other than bottom-right.
+2. NO watermarks, signatures, logos, stamps, brand marks, copyright notices, or "signed by" marks anywhere on the photo or floating across it. The ONLY branding allowed is the small "roastdai.com" text in the bottom-right corner of the white margin described below. If you feel the urge to "sign" this image elsewhere — redirect that urge into the bottom-right branding line and nowhere else.
 3. NO caption bars, title cards, banners, footers, or black strips of any kind.
-4. NO text along the edges of the image or in the four corners that isn't one of the specific jokes listed below.
+4. NO text along the top, left, or right edges of the image that isn't one of the specific jokes listed below. The bottom-right corner is the only exception and only for the "roastdai.com" branding line.
 5. NO modifying the photo itself. Do not add people, objects, furniture, backgrounds, or any new content inside the photo. You are only drawing ON TOP of the existing photo.
-6. NO color other than red for handwriting, arrows, circles, and the doodle. Only red. With a white halo behind letters that sit on dark areas of the photo so they stay readable.
-7. NO text written diagonally across the photo at 45 degrees.
-8. NO computer fonts, printed text, typewriter text, or "neat" calligraphy.
+6. NO color other than red for handwriting, arrows, circles, and the doodle. Only red.
+7. NO text written diagonally across the photo at 45 degrees. No diagonal "ROASTD AI" stamps, no diagonal watermarks, no diagonal anything.
+8. NO computer fonts, printed text, typewriter text, or "neat" calligraphy — except the small "roastdai.com" branding line, which may be a clean simple sans-serif (see BRANDING section).
+
+════════ UNIVERSAL WHITE HALO RULE ════════
+EVERY red letter, word, arrow, circle, and doodle line you draw anywhere on this image — on the photo AND in the white margins — must have a thin white halo/outline tracing its shape.
+
+Why this is universal: on the white margins the halo is invisible (white on white), so it costs nothing. On top of the photo — especially over busy, dark, or reddish areas — the halo is what makes red text readable instead of getting lost. Making the rule universal removes any judgment call about which text gets the halo.
+
+Halo spec:
+- Roughly 2–3x the stroke width of the red letter/line itself.
+- Thick enough to clearly separate the red ink from whatever color is behind it.
+- Thin enough that the result still looks hand-drawn, not like a sticker or cut-out outline.
+- Soft edges OK, but visible enough to do its job against dark or red-ish backgrounds.
+Apply to: every letter of every word, every arrow line and arrowhead, every circle, every underline, every doodle stroke. No exceptions.
 
 ════════ HANDWRITING — LEGIBLE FIRST, MESSY SECOND ════════
 The single most common failure on this task is handwriting that is either (a) too clean and font-like, or (b) so scribbled it's unreadable. Neither is what we want.
@@ -318,7 +330,7 @@ Specifically:
 THE PHOTO = the image in the center of the canvas.
 THE WHITE SPACE = the wide white margins around the photo.
 
-ON THE PHOTO (directly on top of the photo, with a thick white halo behind letters so they stay readable over any background):
+ON THE PHOTO (remember: every red element gets the universal white halo described above):
 A. Write this callout in messy red Sharpie: "${callout.text || ''}"
    Draw a wobbly curved red arrow from the callout text to ${callout.points_to || 'the most obvious thing in the photo'}.
 B. Draw one small red doodle in an open area of the photo: ${roastData.sketch_idea || "a small funny doodle"}.
@@ -332,13 +344,27 @@ ${frameAnnotations}
 BOTTOM OF WHITE SPACE:
 Write this headline in BIGGER messy red Sharpie letters, centered in the bottom white margin: "${roastData.overall_burn || ''}"
 
+════════ BRANDING — REQUIRED, ONE PLACE ONLY ════════
+In the BOTTOM-RIGHT CORNER of the white margin (not on the photo, not diagonal, not across the image), write exactly this text: roastdai.com
+
+Specs for this line and this line only:
+- Small. Think a tasteful footer credit, not a stamp. Roughly the size of fine print on a poster.
+- Clean, simple, readable — a plain sans-serif look is fine, or neat print handwriting. NOT messy Sharpie, NOT large, NOT stylized.
+- Color: a muted gray or light red — understated. Does NOT need the white halo (it's on the white margin).
+- Positioned in the bottom-right corner of the white margin, with a small amount of breathing room from both edges. Horizontal, not tilted, not diagonal.
+- Do NOT add any other branding, URL, or attribution anywhere else. This line is the ONLY place a URL appears in the entire image.
+
+This is the controlled outlet for any signing/branding instinct. Use it, and only it.
+
 ════════ FINAL SELF-CHECK BEFORE OUTPUT ════════
 Scan the entire image once more:
-- Do you see any URL, domain, ".com", "www", or website name? Remove it.
-- Do you see any watermark, signature, logo, or "made by" mark? Remove it.
+- Is "roastdai.com" present EXACTLY ONCE, small, horizontal, in the bottom-right corner of the white margin? If missing, add it. If it appears anywhere else, remove those other copies.
+- Do you see any OTHER URL, domain, ".com", or website name besides the bottom-right branding line? Remove it.
+- Do you see any watermark, signature, logo, or "made by" mark across the photo or floating diagonally? Remove it.
+- Does every red letter, arrow, circle, and doodle stroke have a thin white halo around it? If any red element lacks a halo, add one.
 - Is any word of handwriting hard to read? Rewrite that word more clearly.
 - Did you add anything INSIDE the photo that wasn't there before (new objects, people, backgrounds)? Remove it.
-- Is any text in a color other than red? Make it red.
+- Is any text in a color other than red (except the muted branding line)? Make it red.
 Only output the image after every check passes.`;
 
     const geminiResponse = await fetch(

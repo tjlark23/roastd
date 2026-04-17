@@ -99,9 +99,32 @@ Before output, scan for URLs, watermarks, unreadable handwriting, added photo co
 
 ---
 
+---
+
+## 4. Follow-up pass on Gemini prompt (second commit)
+
+After the first round of testing, two specific failure modes surfaced in generated images:
+
+### Problem A: red text on the photo was unreadable against busy/red-ish backgrounds
+Red annotations on the white margins looked great. Red annotations placed ON the photo — especially when they landed on dark skin tones, red clothing, or busy backgrounds — got lost. The first version of the prompt asked for a white halo only on letters that "sit on dark areas," which required Gemini to make a judgment call it often got wrong.
+
+**Fix:** made the white halo a **universal rule** — every red letter, arrow, circle, and doodle stroke in the entire image gets a thin white halo. On white margins the halo is invisible (white on white, costs nothing); on the photo it's what separates the red ink from whatever is behind it. Added explicit halo spec: 2–3x the stroke width, thick enough to separate colors, thin enough to still feel hand-drawn. Removes the judgment call entirely.
+
+### Problem B: Gemini wrote "ROASTD AI" diagonally across the photo despite the ban
+Pure prohibition wasn't working. The model's "sign the image" instinct was overriding the ban list.
+
+**Fix:** switched from prohibition to **redirection**. Added a required BRANDING section that tells Gemini to write `roastdai.com` exactly once, small, horizontal, clean sans-serif or neat print, in the bottom-right corner of the white margin — muted gray or light red, no halo needed (it sits on white). This gives the signing instinct a controlled outlet AND puts viral-share branding on every image.
+
+The ban list was updated to explicitly carve out this one exception and strengthen everything else: no diagonal stamps, no URLs anywhere else on the image, no other corners, no other branding. Updated the final self-check to verify `roastdai.com` appears exactly once in the bottom-right and nowhere else.
+
+### Net effect on the Gemini prompt structure
+Sections now read: BANS → UNIVERSAL WHITE HALO → HANDWRITING → LAYOUT → BRANDING → SELF-CHECK. The self-check block now verifies: branding present exactly once in the right place, no URLs elsewhere, every red element has a halo, plus all the prior checks.
+
+---
+
 ## Files changed
-- `api/roast.js` — prompts only.
-- `DROID_CHANGES.md` — this memo (new file at repo root).
+- `api/roast.js` — prompts only (two commits).
+- `DROID_CHANGES.md` — this memo (updated across two commits).
 
 ## Files not changed
 - `public/index.html`
