@@ -98,6 +98,186 @@ export const config = {
   maxDuration: 60,
 };
 
+// ─── Watermark post-processing helpers ────────────────────────────────────────
+
+// Patterns that identify Gemini-added watermarks. Checked against each detected
+// text block (not substring — the whole block must normalize to one of these).
+function isWatermarkText(raw) {
+  if (!raw) return false;
+  const norm = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!norm) return false;
+  if (/^roast(d|ed|ing|dai|dailogo)?$/.test(norm)) return true;
+  if (/^roastdai(logo|stamp|watermark|official)?$/.test(norm)) return true;
+  if (/^roastdaicom$/.test(norm)) return true;           // unbranded copy of our URL
+  if (/^(roastd)?take\d+$/.test(norm)) return true;
+  if (/^(roastd)?scene\d+$/.test(norm)) return true;
+  if (/^clapperboard$/.test(norm)) return true;
+  if (/^roastdai?(ai)?(inc|llc|corp|studios?|official)$/.test(norm)) return true;
+  return false;
+}
+
+// Bounding box + rotation from a Vision API boundingPoly (4 vertices in reading order).
+function analyzePoly(vertices) {
+  const xs = vertices.map(v => v.x || 0);
+  const ys = vertices.map(v => v.y || 0);
+  const left = Math.min(...xs);
+  const right = Math.max(...xs);
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  // Angle of the top edge (v0 -> v1) vs horizontal
+  const dx = (vertices[1]?.x || 0) - (vertices[0]?.x || 0);
+  const dy = (vertices[1]?.y || 0) - (vertices[0]?.y || 0);
+  let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+  // Normalize to [-90, 90]
+  if (angleDeg > 90) angleDeg -= 180;
+  if (angleDeg < -90) angleDeg += 180;
+  return { left, top, right, bottom, width: right - left, height: bottom - top, angleDeg };
+}
+
+function rectsOverlap(a, b) {
+  return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+}
+
+function rectContains(outer, inner) {
+  return (
+    inner.left >= outer.left &&
+    inner.top >= outer.top &&
+    inner.right <= outer.right &&
+    inner.bottom <= outer.bottom
+  );
+}
+
+function clampRect(r, maxW, maxH) {
+  const left = Math.max(0, Math.floor(r.left));
+  const top = Math.max(0, Math.floor(r.top));
+  const right = Math.min(maxW, Math.ceil(r.right));
+  const bottom = Math.min(maxH, Math.ceil(r.bottom));
+  return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}
+
+async function removeGeminiWatermarks(geminiBuffer, cleanBuffer, geometry, apiKey) {
+  const sharp = (await import('sharp')).default;
+
+  // Normalize dimensions between Gemini output and our clean reference.
+  const geminiMeta = await sharp(geminiBuffer).metadata();
+  const gemW = geminiMeta.width;
+  const gemH = geminiMeta.height;
+  if (!gemW || !gemH) return { buffer: geminiBuffer, flaggedCount: 0 };
+
+  let cleanResized = cleanBuffer;
+  const cleanMeta = await sharp(cleanBuffer).metadata();
+  if (cleanMeta.width !== gemW || cleanMeta.height !== gemH) {
+    cleanResized = await sharp(cleanBuffer).resize(gemW, gemH, { fit: 'fill' }).png().toBuffer();
+  }
+
+  // Map known photo and branding regions from canvas space into Gemini-output space.
+  const sx = gemW / geometry.canvasW;
+  const sy = gemH / geometry.canvasH;
+  const photoRegion = {
+    left: geometry.padX * sx,
+    top: geometry.padTop * sy,
+    right: (geometry.padX + geometry.imgW) * sx,
+    bottom: (geometry.padTop + geometry.imgH) * sy,
+  };
+  // Generous bottom-right branding zone (wider than the stamp itself to absorb OCR bbox variance).
+  const brandingZone = {
+    left: gemW * 0.62,
+    top: gemH - geometry.padBottom * sy,
+    right: gemW,
+    bottom: gemH,
+  };
+
+  // OCR
+  const visionRes = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: geminiBuffer.toString('base64') },
+          features: [{ type: 'TEXT_DETECTION', maxResults: 50 }],
+        }],
+      }),
+    }
+  );
+
+  if (!visionRes.ok) {
+    const errTxt = await visionRes.text().catch(() => '');
+    console.warn('Vision API non-OK, skipping watermark removal:', visionRes.status, errTxt.substring(0, 200));
+    return { buffer: geminiBuffer, flaggedCount: 0 };
+  }
+
+  const visionData = await visionRes.json();
+  const all = visionData.responses?.[0]?.textAnnotations || [];
+  // Index 0 is the concatenated full-text block; per-word entries follow.
+  const words = all.slice(1);
+  if (words.length === 0) return { buffer: geminiBuffer, flaggedCount: 0 };
+
+  const flagged = [];
+  for (const w of words) {
+    const verts = w.boundingPoly?.vertices || [];
+    if (verts.length < 3) continue;
+    const box = analyzePoly(verts);
+    if (box.width < 4 || box.height < 4) continue;
+
+    // Keep anything fully inside the branding zone — that's our pre-stamped footer.
+    if (rectContains(brandingZone, box)) continue;
+
+    const text = (w.description || '').trim();
+    const isWatermark = isWatermarkText(text);
+    const onPhoto = rectsOverlap(box, photoRegion);
+    const absAngle = Math.abs(box.angleDeg);
+
+    // Rule 1: any watermark-pattern text anywhere outside the branding zone.
+    // Rule 2: large diagonal text (>= 18deg) overlapping the photo — catches ghost stamps
+    //         even when Vision misreads the exact letters.
+    const largeDiagonalOnPhoto =
+      onPhoto &&
+      absAngle >= 18 &&
+      box.width >= gemW * 0.18;
+
+    if (isWatermark || largeDiagonalOnPhoto) {
+      // Pad the bbox so we fully cover the rendered stroke + halo.
+      const padW = Math.max(6, Math.round(box.width * 0.08));
+      const padH = Math.max(6, Math.round(box.height * 0.15));
+      flagged.push({
+        left: box.left - padW,
+        top: box.top - padH,
+        right: box.right + padW,
+        bottom: box.bottom + padH,
+      });
+    }
+  }
+
+  if (flagged.length === 0) return { buffer: geminiBuffer, flaggedCount: 0 };
+
+  // For each flagged rect, extract the same region from the clean buffer and composite it
+  // over the Gemini output. This surgically reverts the region to its pre-annotation state
+  // (minus our intended pre-stamped branding, which is also in the clean buffer).
+  const composites = [];
+  for (const rect of flagged) {
+    const c = clampRect(rect, gemW, gemH);
+    if (c.width === 0 || c.height === 0) continue;
+    const patch = await sharp(cleanResized)
+      .extract({ left: c.left, top: c.top, width: c.width, height: c.height })
+      .png()
+      .toBuffer();
+    composites.push({ input: patch, left: c.left, top: c.top });
+  }
+
+  if (composites.length === 0) return { buffer: geminiBuffer, flaggedCount: 0 };
+
+  const finalBuffer = await sharp(geminiBuffer)
+    .composite(composites)
+    .png()
+    .toBuffer();
+
+  return { buffer: finalBuffer, flaggedCount: composites.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -268,13 +448,40 @@ Pay extra attention to frame jokes 1 and 4 — those are the ones people remembe
     const canvasH = imgH + padTop + padBottom;
     
     // Create white canvas with photo centered
-    const framedBuffer = await sharp({
+    const baseFramedBuffer = await sharp({
       create: { width: canvasW, height: canvasH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
     })
     .composite([{ input: imgBuffer, left: padX, top: padTop }])
     .png()
     .toBuffer();
-    
+
+    // Pre-stamp "roastdai.com" in the bottom-right of the white margin BEFORE sending to Gemini.
+    // This gives Gemini's "sign the image" instinct nothing to do — the branding is already on
+    // the canvas when it sees it. The Gemini prompt is updated to match.
+    const brandingFontPx = Math.max(16, Math.round(canvasH * 0.013));
+    const brandingRightInset = Math.round(canvasW * 0.025);
+    const brandingBottomInset = Math.round(padBottom * 0.22);
+    const brandingSvg = Buffer.from(
+      `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">
+        <text x="${canvasW - brandingRightInset}" y="${canvasH - brandingBottomInset}"
+              font-family="Helvetica, Arial, sans-serif"
+              font-size="${brandingFontPx}"
+              fill="#888888"
+              text-anchor="end"
+              font-weight="400">roastdai.com</text>
+      </svg>`
+    );
+
+    const framedBuffer = await sharp(baseFramedBuffer)
+      .composite([{ input: brandingSvg, top: 0, left: 0 }])
+      .png()
+      .toBuffer();
+
+    // This is our authoritative clean reference used later to surgically erase any watermarks
+    // Gemini adds. It already contains the branding, so replacing a flagged region near the
+    // bottom-right preserves branding correctly.
+    const cleanFramedBuffer = framedBuffer;
+
     const framedBase64 = framedBuffer.toString('base64');
 
     // ═══════ STEP 3: Gemini — Write annotations on the pre-framed image ═══════
@@ -344,27 +551,24 @@ ${frameAnnotations}
 BOTTOM OF WHITE SPACE:
 Write this headline in BIGGER messy red Sharpie letters, centered in the bottom white margin: "${roastData.overall_burn || ''}"
 
-════════ BRANDING — REQUIRED, ONE PLACE ONLY ════════
-In the BOTTOM-RIGHT CORNER of the white margin (not on the photo, not diagonal, not across the image), write exactly this text: roastdai.com
+════════ BRANDING — ALREADY HANDLED, DO NOT TOUCH ════════
+The image processor has ALREADY placed the text "roastdai.com" as a small gray footer credit in the bottom-right corner of the white margin. It is there before you touched this image.
 
-Specs for this line and this line only:
-- Small. Think a tasteful footer credit, not a stamp. Roughly the size of fine print on a poster.
-- Clean, simple, readable — a plain sans-serif look is fine, or neat print handwriting. NOT messy Sharpie, NOT large, NOT stylized.
-- Color: a muted gray or light red — understated. Does NOT need the white halo (it's on the white margin).
-- Positioned in the bottom-right corner of the white margin, with a small amount of breathing room from both edges. Horizontal, not tilted, not diagonal.
-- Do NOT add any other branding, URL, or attribution anywhere else. This line is the ONLY place a URL appears in the entire image.
+You must:
+- NOT add any URL, domain, ".com", website name, or any text resembling "ROASTD", "ROASTD AI", "ROASTED", "TAKE [number]", "SCENE [number]", clapperboard text, or any watermark of any kind anywhere on the image.
+- NOT re-draw, duplicate, overwrite, or modify the existing "roastdai.com" footer. Leave that exact pixel region alone.
+- NOT write the word "ROASTD" anywhere. Not diagonally, not in a corner, not as a stamp, not inside a joke, not in handwriting, not faded, not ghosted. Zero instances.
 
-This is the controlled outlet for any signing/branding instinct. Use it, and only it.
+The branding is complete. The signing urge must be ignored entirely. There is nothing left for you to add in terms of branding or attribution. Any text resembling a watermark will be automatically detected and erased by a post-processor — so adding one is wasted effort that also damages your output.
 
 ════════ FINAL SELF-CHECK BEFORE OUTPUT ════════
 Scan the entire image once more:
-- Is "roastdai.com" present EXACTLY ONCE, small, horizontal, in the bottom-right corner of the white margin? If missing, add it. If it appears anywhere else, remove those other copies.
-- Do you see any OTHER URL, domain, ".com", or website name besides the bottom-right branding line? Remove it.
-- Do you see any watermark, signature, logo, or "made by" mark across the photo or floating diagonally? Remove it.
+- Did you add any text containing "ROASTD", "ROASTED", "TAKE N", "SCENE N", or a URL anywhere? If yes, REMOVE IT. The only "roastdai.com" on the image is the pre-existing footer in the bottom-right — do not add a second one, do not modify the first one.
+- Do you see any watermark, signature, logo, stamp, or "made by" mark across the photo or floating diagonally? Remove it.
 - Does every red letter, arrow, circle, and doodle stroke have a thin white halo around it? If any red element lacks a halo, add one.
 - Is any word of handwriting hard to read? Rewrite that word more clearly.
 - Did you add anything INSIDE the photo that wasn't there before (new objects, people, backgrounds)? Remove it.
-- Is any text in a color other than red (except the muted branding line)? Make it red.
+- Is any text in a color other than red (except the pre-existing gray branding footer which you did not draw)? Make it red.
 Only output the image after every check passes.`;
 
     const geminiResponse = await fetch(
@@ -414,9 +618,34 @@ Only output the image after every check passes.`;
       return res.status(500).json({ error: "No image in response. Try again." });
     }
 
+    // ═══════ STEP 4: Post-process — detect and surgically remove Gemini watermarks ═══════
+    // Prompt-layer bans don't fully stop Gemini from stamping "ROASTD" / "TAKE N" across the
+    // photo. We OCR the output via Google Cloud Vision, classify each detected text block,
+    // and composite the clean pre-Gemini buffer over any region that matches a watermark
+    // pattern. Fails open: any error here returns the Gemini image unchanged.
+    let finalImageBase64 = generatedImageBase64;
+    let finalMimeType = generatedMimeType;
+    try {
+      const cleaned = await removeGeminiWatermarks(
+        Buffer.from(generatedImageBase64, 'base64'),
+        cleanFramedBuffer,
+        { canvasW, canvasH, padX, padTop, padBottom, imgW, imgH },
+        GOOGLE_API_KEY
+      );
+      if (cleaned && cleaned.buffer) {
+        finalImageBase64 = cleaned.buffer.toString('base64');
+        finalMimeType = 'image/png';
+        if (cleaned.flaggedCount > 0) {
+          console.log(`Watermark post-process: removed ${cleaned.flaggedCount} region(s).`);
+        }
+      }
+    } catch (err) {
+      console.warn('Watermark post-process failed (returning Gemini image as-is):', err.message);
+    }
+
     return res.status(200).json({
       success: true,
-      image: `data:${generatedMimeType};base64,${generatedImageBase64}`,
+      image: `data:${finalMimeType};base64,${finalImageBase64}`,
       roastData,
       remaining: req._remaining ?? null,
     });

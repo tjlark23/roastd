@@ -122,9 +122,69 @@ Sections now read: BANS → UNIVERSAL WHITE HALO → HANDWRITING → LAYOUT → 
 
 ---
 
+---
+
+## 5. Code-layer watermark removal (third commit)
+
+After three rounds of prompt tuning, Gemini was still adding "ROASTD" stamps, diagonal watermarks, and fake "TAKE N" clapperboard text across the photo. The prompt layer was clearly out of leverage. This pass moves the problem to the code layer where we have actual guarantees.
+
+### Change 1 — Pre-stamp the branding ourselves via Sharp
+
+Before the image ever reaches Gemini, Sharp now composites `roastdai.com` as small gray footer text into the bottom-right corner of the white margin using an SVG overlay. Font: Helvetica/Arial sans-serif, size scaled to ~1.3% of canvas height, inset from bottom-right.
+
+Rationale: if the branding is already on the canvas when Gemini sees it, its "sign the image" instinct has nothing left to do. No redirection needed — the outlet is pre-filled.
+
+The Gemini prompt was updated accordingly: the `BRANDING` section no longer asks Gemini to write the URL; it now tells Gemini the branding is already there, must not be duplicated, modified, or overwritten, and any `ROASTD` / `TAKE N` / `SCENE N` / clapperboard / URL text anywhere else will be automatically detected and erased by a post-processor. We explicitly tell Gemini that adding a watermark is wasted effort that also damages its output — giving the model a reason to comply beyond "because we said so."
+
+### Change 2 — Google Cloud Vision OCR + surgical composite removal
+
+A new post-processing step runs AFTER Gemini returns and BEFORE the response goes back to the frontend. Flow:
+
+1. Send the Gemini output to Google Cloud Vision `TEXT_DETECTION`.
+2. For every text block detected, compute its bounding box and rotation angle from the polygon vertices.
+3. Classify each block:
+   - **Keep** if the box sits entirely inside the generous bottom-right branding zone — that's our pre-stamped footer and should not be touched.
+   - **Flag as watermark** if the text content normalizes to a known watermark pattern: `roastd`, `roasted`, `roastdai`, `roastdaicom`, `take N`, `scene N`, `clapperboard`, `roastd ai`, etc. Full-block match only (not substring) to avoid nuking legitimate jokes that happen to contain the word "roast".
+   - **Also flag** any large diagonal text (angle >= 18 degrees from horizontal, width >= 18 percent of canvas) that overlaps the photo region — catches ghost stamps even when Vision misreads the exact letters.
+4. For each flagged rectangle, pad the bounding box by ~8 percent width / ~15 percent height, then extract that exact pixel region from the **pre-Gemini clean framed buffer** (which has the photo + white margin + our pre-stamped branding, but zero Gemini annotations) and composite it over the Gemini output. This surgically reverts just the watermark region to the pre-annotation state.
+
+Dimension mismatch is handled: if Gemini returns a different pixel size than our input canvas, the clean buffer is resized to match before region extraction, and the canvas-space photo/branding coordinates are scaled to Gemini-space.
+
+### Change 3 — Fail-open error handling
+
+Every failure mode in the post-processor returns the Gemini image unchanged instead of erroring:
+- Vision API returns non-200 (e.g., Cloud Vision API not enabled yet on the GCP project).
+- Vision returns zero text blocks.
+- Sharp extract/composite fails on edge coordinates.
+- Any thrown exception inside the helper.
+
+Worst case: behavior reverts to the current prompt-only pipeline. No user-visible regression.
+
+### Why this should finally work
+
+- The pre-stamp removes the motivation to add a watermark at all.
+- The prompt now includes the real consequence ("a post-processor will erase it").
+- Even if Gemini still adds one, the OCR + surgical composite removes it deterministically.
+- The clean-buffer-patch approach can't damage legitimate on-photo callouts unless a watermark actually overlaps one — which is rare because ghost stamps target open space.
+
+### Dependencies
+
+No new npm packages. Sharp (already installed) handles compositing. Google Cloud Vision is an HTTP call with the existing `GOOGLE_API_KEY` — but Vision must be enabled in the same GCP project (Google Cloud Console → APIs & Services → enable "Cloud Vision API"). Cost: ~$1.50 per 1,000 calls. Free tier covers first 1,000/month.
+
+### Key new code surface in `api/roast.js`
+
+- `isWatermarkText(raw)` — normalizes a word and matches against known watermark patterns.
+- `analyzePoly(vertices)` — computes bbox + rotation angle from a Vision boundingPoly.
+- `rectsOverlap`, `rectContains`, `clampRect` — small rectangle math helpers.
+- `removeGeminiWatermarks(geminiBuffer, cleanBuffer, geometry, apiKey)` — main post-process function. Returns `{ buffer, flaggedCount }`.
+- New STEP 4 block in the main handler that wraps the call in try/catch and substitutes the cleaned buffer if anything was flagged.
+
+---
+
 ## Files changed
-- `api/roast.js` — prompts only (two commits).
-- `DROID_CHANGES.md` — this memo (updated across two commits).
+- `api/roast.js` — prompts + new post-processing code (three commits total).
+- `public/index.html` — client-side resize before upload (second commit).
+- `DROID_CHANGES.md` — this memo (updated across four commits).
 
 ## Files not changed
 - `public/index.html`
