@@ -525,8 +525,14 @@ Pay extra attention to frame jokes 1 and 4 — those are the ones people remembe
           remaining: req._remaining ?? null,
         });
       } catch (err) {
-        console.error('Font engine render failed:', err);
-        return res.status(500).json({ error: 'Annotation render failed. Try again.' });
+        // Log the full stack server-side
+        console.error('Font engine render failed:', err && err.stack || err);
+        // In debug mode, surface the actual error to the client so we can diagnose
+        // without hunting through Vercel logs. Production users still see a generic message.
+        const errMsg = isDebug
+          ? `[fonts engine] ${err && err.message ? err.message : String(err)}`
+          : 'Annotation render failed. Try again.';
+        return res.status(500).json({ error: errMsg, stack: isDebug ? (err && err.stack) : undefined });
       }
     }
 

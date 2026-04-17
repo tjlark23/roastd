@@ -5,8 +5,9 @@
 
 import sharp from 'sharp';
 import opentype from 'opentype.js';
-import rough from 'roughjs';
+import roughDefault from 'roughjs';
 import path from 'node:path';
+import fsSync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeRng, hashString } from './rng.js';
 import {
@@ -19,7 +20,25 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FONTS_DIR = path.join(__dirname, '..', 'fonts');
+
+// Vercel's @vercel/node bundler may flatten or relocate files. Try the most
+// likely paths in order; first one that exists wins.
+function resolveFontsDir() {
+  const candidates = [
+    path.join(__dirname, '..', 'fonts'),
+    path.join(process.cwd(), 'api', 'fonts'),
+    path.join(process.cwd(), 'fonts'),
+    '/var/task/api/fonts',
+  ];
+  for (const c of candidates) {
+    try {
+      if (fsSync.existsSync(path.join(c, 'PermanentMarker-Regular.ttf'))) return c;
+    } catch (_) { /* continue */ }
+  }
+  // Fall back to the conventional location and let opentype.js throw a
+  // descriptive ENOENT including the bad path.
+  return path.join(__dirname, '..', 'fonts');
+}
 
 const RED = '#d91c1c';
 const HALO = '#ffffff';
@@ -43,23 +62,50 @@ const STYLE_FONT_MAP = {
 // ─── Font loading (cached on globalThis for warm-start reuse) ─────────────────
 function loadFonts() {
   if (globalThis.__roastdFonts) return globalThis.__roastdFonts;
+  const dir = resolveFontsDir();
+  const loadOne = (file) => {
+    const p = path.join(dir, file);
+    try {
+      return opentype.loadSync(p);
+    } catch (e) {
+      const msg = `Failed to load font ${p}: ${e && e.message ? e.message : e}`;
+      const err = new Error(msg);
+      err.cause = e;
+      throw err;
+    }
+  };
   const fonts = {
-    permanentMarker: opentype.loadSync(path.join(FONTS_DIR, 'PermanentMarker-Regular.ttf')),
-    caveat: opentype.loadSync(path.join(FONTS_DIR, 'Caveat-Variable.ttf')),
-    patrickHand: opentype.loadSync(path.join(FONTS_DIR, 'PatrickHand-Regular.ttf')),
-    kalam: opentype.loadSync(path.join(FONTS_DIR, 'Kalam-Regular.ttf')),
-    architectsDaughter: opentype.loadSync(path.join(FONTS_DIR, 'ArchitectsDaughter-Regular.ttf')),
+    permanentMarker: loadOne('PermanentMarker-Regular.ttf'),
+    caveat: loadOne('Caveat-Variable.ttf'),
+    patrickHand: loadOne('PatrickHand-Regular.ttf'),
+    kalam: loadOne('Kalam-Regular.ttf'),
+    architectsDaughter: loadOne('ArchitectsDaughter-Regular.ttf'),
   };
   globalThis.__roastdFonts = fonts;
   return fonts;
 }
 
-// ─── Rough.js generator (Node-safe API) ───────────────────────────────────────
+// ─── Rough.js generator (Node-safe API; tolerant of CJS/ESM interop shapes) ──
 function getRoughGenerator() {
-  // roughjs publishes a CJS export; handle both interop shapes.
-  const r = rough.default || rough;
-  if (!globalThis.__roastdRough) globalThis.__roastdRough = r.generator();
-  return globalThis.__roastdRough;
+  if (globalThis.__roastdRough) return globalThis.__roastdRough;
+  const candidates = [
+    roughDefault,
+    roughDefault && roughDefault.default,
+    roughDefault && roughDefault.rough,
+  ].filter(Boolean);
+  for (const c of candidates) {
+    if (typeof c?.generator === 'function') {
+      globalThis.__roastdRough = c.generator();
+      return globalThis.__roastdRough;
+    }
+  }
+  // As a last resort, see if it exposes RoughGenerator class directly.
+  const RG = roughDefault?.RoughGenerator || roughDefault?.default?.RoughGenerator;
+  if (typeof RG === 'function') {
+    globalThis.__roastdRough = new RG({}, { width: 1000, height: 1000 });
+    return globalThis.__roastdRough;
+  }
+  throw new Error(`roughjs import shape not recognized; got keys: ${Object.keys(roughDefault || {}).join(',')}`);
 }
 
 // Convert a Rough.js Drawable's op sets into SVG <path> strings. The generator
