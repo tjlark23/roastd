@@ -8,7 +8,6 @@ import opentype from 'opentype.js';
 import roughDefault from 'roughjs';
 import path from 'node:path';
 import fsSync from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { makeRng, hashString } from './rng.js';
 import {
   buildFrameLayout,
@@ -19,25 +18,26 @@ import {
 } from './layout.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Vercel's @vercel/node bundler may flatten or relocate files. Try the most
-// likely paths in order; first one that exists wins.
+// NOTE: No import.meta.url or __dirname derivation. Vercel's @vercel/node
+// ESM→CJS compiler doesn't rewrite import.meta, which blows up at load time.
+// We use cwd-relative + absolute-path candidates; the serverless runtime
+// reliably sets cwd to the function root (/var/task), and vercel.json's
+// includeFiles config bundles api/fonts/** into that root.
 function resolveFontsDir() {
   const candidates = [
-    path.join(__dirname, '..', 'fonts'),
     path.join(process.cwd(), 'api', 'fonts'),
     path.join(process.cwd(), 'fonts'),
     '/var/task/api/fonts',
+    '/var/task/fonts',
   ];
   for (const c of candidates) {
     try {
       if (fsSync.existsSync(path.join(c, 'PermanentMarker-Regular.ttf'))) return c;
     } catch (_) { /* continue */ }
   }
-  // Fall back to the conventional location and let opentype.js throw a
-  // descriptive ENOENT including the bad path.
-  return path.join(__dirname, '..', 'fonts');
+  // Fall back to the conventional cwd-relative location and let opentype.js
+  // throw a descriptive ENOENT including the bad path.
+  return path.join(process.cwd(), 'api', 'fonts');
 }
 
 const RED = '#d91c1c';
