@@ -1,4 +1,5 @@
 # Roastd AI
+Live: https://roastdai.com
 
 Upload any screenshot. Pick who roasts you. Get destroyed in seconds.
 
