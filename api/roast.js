@@ -98,6 +98,20 @@ export const config = {
   maxDuration: 60,
 };
 
+// ─── Handwriting engine selection ─────────────────────────────────────────────
+// HANDWRITING_ENGINE env var: 'fonts' (new font+Rough.js renderer, default) or
+// 'gemini' (legacy Gemini + Vision OCR path kept as a fallback). Request body
+// may override via `engine` when debug mode is on.
+function resolveEngine({ envEngine, requestEngine, isDebug }) {
+  const allowed = new Set(['fonts', 'gemini']);
+  if (isDebug && allowed.has(requestEngine)) return requestEngine;
+  if (allowed.has(envEngine)) return envEngine;
+  if (envEngine && !allowed.has(envEngine)) {
+    console.warn(`Unknown HANDWRITING_ENGINE='${envEngine}', falling back to 'fonts'`);
+  }
+  return 'fonts';
+}
+
 // ─── Watermark post-processing helpers ────────────────────────────────────────
 
 // Patterns that identify Gemini-added watermarks. Checked against each detected
@@ -311,8 +325,17 @@ export default async function handler(req, res) {
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
-    if (!ANTHROPIC_API_KEY || !GOOGLE_API_KEY) {
-      return res.status(500).json({ error: "API keys not configured" });
+    const resolvedEngine = resolveEngine({
+      envEngine: process.env.HANDWRITING_ENGINE,
+      requestEngine: typeof req.body?.engine === 'string' ? req.body.engine : null,
+      isDebug,
+    });
+
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: "API keys not configured (ANTHROPIC_API_KEY)" });
+    }
+    if (resolvedEngine === 'gemini' && !GOOGLE_API_KEY) {
+      return res.status(500).json({ error: "API keys not configured (GOOGLE_API_KEY)" });
     }
 
     const categoryPrompt = CATEGORY_PROMPTS[category] || CATEGORY_PROMPTS.selfie;
@@ -482,9 +505,34 @@ Pay extra attention to frame jokes 1 and 4 — those are the ones people remembe
     // bottom-right preserves branding correctly.
     const cleanFramedBuffer = framedBuffer;
 
+    // ═══════ STEP 3 — ENGINE BRANCH ═════════════════════════════════════════════
+    // Default engine renders annotations with bundled fonts + Rough.js (fully
+    // deterministic, no external image-gen call). Legacy Gemini path stays
+    // available behind HANDWRITING_ENGINE=gemini.
+    if (resolvedEngine === 'fonts') {
+      try {
+        const { renderAnnotations } = await import('./lib/handwriting.js');
+        const finalBuffer = await renderAnnotations({
+          framedBuffer: cleanFramedBuffer,
+          roastData,
+          style,
+          canvasGeometry: { canvasW, canvasH, padX, padTop, padBottom, imgW, imgH },
+        });
+        return res.status(200).json({
+          success: true,
+          image: `data:image/png;base64,${finalBuffer.toString('base64')}`,
+          roastData,
+          remaining: req._remaining ?? null,
+        });
+      } catch (err) {
+        console.error('Font engine render failed:', err);
+        return res.status(500).json({ error: 'Annotation render failed. Try again.' });
+      }
+    }
+
     const framedBase64 = framedBuffer.toString('base64');
 
-    // ═══════ STEP 3: Gemini — Write annotations on the pre-framed image ═══════
+    // ═══════ STEP 3 (GEMINI PATH) — Write annotations on the pre-framed image ═
     
     const callout = roastData.callout || {};
     

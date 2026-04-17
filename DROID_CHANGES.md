@@ -181,10 +181,102 @@ No new npm packages. Sharp (already installed) handles compositing. Google Cloud
 
 ---
 
+---
+
+## 6. Handwriting engine swap — Gemini out, fonts + Rough.js in (feature-flagged)
+
+After five commits of prompt/code-layer mitigation on the Gemini path (ghost "ROASTD" stamps, diagonal watermarks, clapperboard text, inconsistent handwriting, occasional photo degradation), we moved the annotation layer to a deterministic server-side renderer. Gemini kept as a fallback behind a feature flag until we validate the new path on 20+ real roasts.
+
+### Research and planning
+
+- `APPROACH_MEMO.md` at repo root compares three candidates: sjvasquez/handwriting-synthesis (self-hosted RNN), HandtextAI API (commercial, sales-gated), and the chosen path: handwriting fonts + Rough.js + Sharp compositing entirely in the existing Vercel function.
+- `PLAN.md` at repo root has the full implementation plan that was approved before coding.
+- Font audition was done first: rendered the same sample roast with three font pairings side-by-side in `mockups/outputs/audition_*.png`. Set B (Permanent Marker for headline + callout, Caveat for jokes) was approved.
+
+### New architecture
+
+Feature flag `HANDWRITING_ENGINE` env var:
+- `fonts` (default if unset) — new font + Rough.js pipeline.
+- `gemini` — legacy Gemini + Vision OCR pipeline (kept intact).
+- Debug-mode requests may override via `engine` field in request body (`?debug=roastd2026` must also be set).
+
+`api/roast.js` branches right after Sharp framing + `roastdai.com` pre-stamp. The fonts branch returns immediately without ever touching Gemini. The Gemini branch runs the existing pipeline unchanged.
+
+### New modules
+
+- `api/lib/rng.js` — seeded PRNG (LCG) + FNV-1a string hash. Used everywhere jitter is applied so outputs are reproducible given the same `roastData`.
+- `api/lib/layout.js` — pure geometry. Given canvas dimensions returns zone anchors for frame jokes (top / left / right-upper / right-lower), callout, headline, doodle, and circle target. No rendering.
+- `api/lib/handwriting.js` — main renderer. Loads fonts once (cached on `globalThis` for warm-start reuse), exposes `renderAnnotations({ framedBuffer, roastData, style, canvasGeometry })`, returns a PNG buffer.
+
+### Rendering specifics
+
+- Text: opentype.js reads TTFs and emits per-character SVG paths. Per-glyph jitter: ±3% size, ±4% baseline drift.
+- Universal white halo via SVG `paint-order="stroke fill"` — halo width scales with font size (`max(3, fontSize × 0.15)`). Invisible on white margin, critical over the photo.
+- Color: single constant `#d91c1c` (Sharpie red). No exceptions.
+- Text wrapping: auto-fits joke text to its zone width. Shrinks font size in 6% steps down to a floor of `0.70 × startSize` or an absolute `14–18 px` minimum before wrapping to up to 3 lines.
+- Arrows: Rough.js `gen.curve()` with perpendicular-offset control point, `roughness: 2.2`, `bowing: 1.2`. Seeded per call. Arrowhead is a 2-stroke `gen.linearPath` at the tangent angle. White halo drawn first at 2.2× stroke width, colored stroke on top.
+- Circle on photo: Rough.js ellipse with `roughness: 2.6`.
+- Doodle: keyword-matched library (star, speech bubble, trophy, price tag, X, heart) rendered via Rough.js primitives. Default fallback is a star + "lol" label.
+- Bottom-right `roastdai.com`: reused the existing Sharp SVG pre-stamp. No changes.
+
+### Bundled fonts (all Google Fonts, OFL or Apache 2.0)
+
+| File | License | Size |
+|---|---|---|
+| `PermanentMarker-Regular.ttf` | Apache 2.0 | 75 KB |
+| `Caveat-Variable.ttf` | OFL 1.1 | 400 KB |
+| `PatrickHand-Regular.ttf` | OFL 1.1 | 215 KB |
+| `Kalam-Regular.ttf` | OFL 1.1 | 427 KB |
+| `ArchitectsDaughter-Regular.ttf` | OFL 1.1 | 43 KB |
+
+Full attributions in `api/fonts/LICENSE-FONTS.md`. Total bundle impact: ~1.16 MB of fonts + ~170 KB of new JS. Current function ~14 MB; new total ~15.3 MB. Well under Vercel's 50 MB compressed limit.
+
+### Style-to-font mapping (hardcoded in `api/lib/handwriting.js`)
+
+Headline and on-photo callout stay on Permanent Marker across all styles. Joke font varies:
+
+| Style | Joke font |
+|---|---|
+| `genz`, `aussie`, `redneck` (default) | Caveat |
+| `boomer`, `coworker`, `asian_parent` | Patrick Hand |
+| `shakespeare`, `british` | Architects Daughter |
+| `jewish_mom` | Kalam |
+| `jackson` | Permanent Marker (max aggression) |
+
+Unknown styles fall back to Caveat.
+
+### What stays unchanged
+
+- `public/index.html` (frontend, client-side resize).
+- Claude prompt and JSON schema (`callout`, `frame`, `overall_burn`, `sketch_idea`).
+- Sharp framing geometry (40% padX, 25% padTop, 35% padBottom).
+- `roastdai.com` bottom-right branding pre-stamp.
+- Stripe integration, rate limiting, debug bypass.
+- All Gemini + Vision OCR code (behind the feature flag).
+
+### What's out of scope for this commit
+
+- Second Claude call to resolve `points_to` to pixel coordinates (zone-based layout is used instead — semantic arrow targeting is traded for 100% reliability).
+- Deletion of the Gemini pipeline. That's commit 2 after 20+ real-roast validation.
+- Per-roast Caveat weight variation (variable font supports it but nice-to-have).
+
+### Rollback plan
+
+If anything misbehaves on Production: flip `HANDWRITING_ENGINE=gemini` in Vercel Production env vars. No code redeploy required — the flag is read per-invocation. Pipeline reverts to the old Gemini path instantly.
+
+### Validation before removing Gemini (next commit)
+
+Run 20+ real roasts across varied images on the Preview deployment with `HANDWRITING_ENGINE=fonts`. Confirm: all 4 frame jokes legible and inside white margins (or within halo-rescued overflow), callout on photo readable, wobbly arrows not straight, circle present, doodle present, bottom-right branding present, no stray URLs or watermarks. Optional A/B: flip to `engine=gemini` via debug body param on the same image. Once validated, commit 2 removes the Gemini + Vision code entirely.
+
+---
+
 ## Files changed
-- `api/roast.js` — prompts + new post-processing code (three commits total).
-- `public/index.html` — client-side resize before upload (second commit).
-- `DROID_CHANGES.md` — this memo (updated across four commits).
+- `api/roast.js` — prompts + Gemini post-processing + new `resolveEngine()` helper and fonts branch.
+- `api/lib/rng.js`, `api/lib/layout.js`, `api/lib/handwriting.js` — new modules (fonts engine).
+- `api/fonts/*.ttf` — five bundled handwriting fonts + `LICENSE-FONTS.md`.
+- `public/index.html` — client-side resize before upload (earlier commit).
+- `package.json` — added `opentype.js`, `roughjs`.
+- `APPROACH_MEMO.md`, `PLAN.md`, `DROID_CHANGES.md` — this memo (updated across six commits).
 
 ## Files not changed
 - `public/index.html`
