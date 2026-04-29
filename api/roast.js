@@ -1,5 +1,5 @@
 // api/roast.js — Roastd AI v4
-// Claude Sonnet 4.5 (step-by-step comedy writing) → Gemini (framed annotated image)
+// Claude Sonnet 4.5 (step-by-step comedy writing) → Sharp (1024x1024 square frame) → OpenAI gpt-image-1 (handwritten annotations)
 
 const ipUsage = new Map();
 const FREE_LIMIT = 3;
@@ -95,7 +95,7 @@ const STYLE_PROMPTS = {
 };
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 90,
 };
 
 export default async function handler(req, res) {
@@ -129,9 +129,9 @@ export default async function handler(req, res) {
     }
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-    const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-    if (!ANTHROPIC_API_KEY || !GOOGLE_API_KEY) {
+    if (!ANTHROPIC_API_KEY || !OPENAI_API_KEY) {
       return res.status(500).json({ error: "API keys not configured" });
     }
 
@@ -243,41 +243,51 @@ BEFORE YOU OUTPUT: Read every joke. Is it actually funny or just a description w
       return res.status(500).json({ error: "Claude was too brutal to be contained. Try again." });
     }
 
-    // ═══════ STEP 2: Build white frame around photo using Sharp ═══════
+    // ═══════ STEP 2: Build square 1024x1024 white frame around photo using Sharp ═══════
+    // OpenAI gpt-image-1 only accepts fixed sizes (1024x1024, 1536x1024, 1024x1536).
+    // We use square so handwriting scale and prompt zones are consistent for every roast.
     const sharp = (await import('sharp')).default;
-    
-    // Decode the uploaded image
+
     const imgBuffer = Buffer.from(image, 'base64');
-    const imgMeta = await sharp(imgBuffer).metadata();
-    const imgW = imgMeta.width;
-    const imgH = imgMeta.height;
-    
-    // Add 40% padding on sides and 30% top/bottom for big white frame
-    const padX = Math.round(imgW * 0.40);
-    const padTop = Math.round(imgH * 0.25);
-    const padBottom = Math.round(imgH * 0.35); // extra room for headline
-    const canvasW = imgW + padX * 2;
-    const canvasH = imgH + padTop + padBottom;
-    
-    // Create white canvas with photo centered
+
+    // Resize the source so its longer side fits ~55% of the final canvas.
+    // .rotate() with no args applies EXIF orientation so portrait phone shots
+    // don't get composited sideways. Resizing first (instead of compositing onto
+    // a giant canvas then scaling down) avoids Sharp's composite-larger-than-base
+    // error and keeps memory bounded on big mobile uploads.
+    const FINAL_CANVAS = 1024;
+    const PHOTO_TARGET = Math.round(FINAL_CANVAS / 1.8); // ~569px
+
+    const resizedBuffer = await sharp(imgBuffer)
+      .rotate()
+      .resize({ width: PHOTO_TARGET, height: PHOTO_TARGET, fit: 'inside' })
+      .toBuffer();
+    const resizedMeta = await sharp(resizedBuffer).metadata();
+
+    const left = Math.round((FINAL_CANVAS - resizedMeta.width) / 2);
+    const top = Math.round((FINAL_CANVAS - resizedMeta.height) / 2);
+
     const framedBuffer = await sharp({
-      create: { width: canvasW, height: canvasH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+      create: { width: FINAL_CANVAS, height: FINAL_CANVAS, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
     })
-    .composite([{ input: imgBuffer, left: padX, top: padTop }])
+    .composite([{ input: resizedBuffer, left, top }])
     .png()
     .toBuffer();
-    
-    const framedBase64 = framedBuffer.toString('base64');
 
-    // ═══════ STEP 3: Gemini — Write annotations on the pre-framed image ═══════
-    
+    // ═══════ STEP 3: OpenAI gpt-image-1 — Write annotations on the pre-framed image ═══════
+
     const callout = roastData.callout || {};
-    
+
     const frameAnnotations = (roastData.frame || [])
       .map((a, i) => `  ${i + 1}. "${a.text}" — draw an arrow from this text into the photo pointing at ${a.points_to}`)
       .join("\n");
 
-    const geminiPrompt = `This image shows a photo centered on a large white background. Your job: annotate it like someone printed this photo and went at it with a red Sharpie while laughing.
+    const openaiPrompt = `You are looking at a photo placed in the center of a 1024x1024 white canvas. The photo occupies roughly the middle 55% of the canvas; the rest is white border.
+
+CRITICAL — PRESERVE THE PHOTO:
+Do NOT redraw, re-render, modify, recolor, blur, or alter the photo in the center in any way. The photo must remain pixel-identical to the input. You are only ADDING handwritten annotations on top of it — like someone took a red Sharpie to a printed photo.
+
+YOUR JOB: Annotate this canvas like an angry comedian with a red marker.
 
 THE PHOTO = the image in the center.
 THE WHITE SPACE = the wide white border around the photo.
@@ -294,7 +304,7 @@ Write these jokes in the white border around the photo. Spread them evenly — 1
 ${frameAnnotations}
 
 === BOTTOM OF WHITE SPACE ===
-Write the headline in bigger messy letters: "${roastData.overall_burn || ''}"
+Write the headline in bigger messy letters at the bottom of the white border: "${roastData.overall_burn || ''}"
 
 === HANDWRITING STYLE (critical) ===
 Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Think:
@@ -312,58 +322,44 @@ Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Thi
 - Do NOT write any text diagonally across the photo
 - Do NOT use computer fonts, printed text, or neat handwriting
 - Do NOT use any color besides red for text and arrows
-- Do NOT make arrows straight`;
+- Do NOT make arrows straight
+- Do NOT modify, redraw, or alter the photo content in any way`;
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${GOOGLE_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: "image/png", data: framedBase64 } },
-              { text: geminiPrompt },
-            ],
-          }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-        }),
-      }
-    );
+    const openaiQuality = process.env.OPENAI_IMAGE_QUALITY || 'high';
 
-    if (!geminiResponse.ok) {
-      const gemErr = await geminiResponse.text();
-      console.error("Gemini error:", geminiResponse.status, gemErr.substring(0, 300));
-      return res.status(500).json({ error: `Gemini API error ${geminiResponse.status}: ${gemErr.substring(0, 200)}` });
+    const formData = new FormData();
+    formData.append('model', 'gpt-image-1');
+    formData.append('image', new Blob([framedBuffer], { type: 'image/png' }), 'framed.png');
+    formData.append('prompt', openaiPrompt);
+    formData.append('size', '1024x1024');
+    formData.append('quality', openaiQuality);
+    formData.append('n', '1');
+    formData.append('output_format', 'png');
+    formData.append('moderation', 'low');
+
+    const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      body: formData,
+    });
+
+    if (!openaiResponse.ok) {
+      const oaiErr = await openaiResponse.text();
+      console.error("OpenAI error:", openaiResponse.status, oaiErr.substring(0, 300));
+      return res.status(500).json({ error: `OpenAI API error ${openaiResponse.status}: ${oaiErr.substring(0, 200)}` });
     }
 
-    const geminiData = await geminiResponse.json();
-    const candidates = geminiData.candidates;
-
-    if (!candidates?.length) {
-      return res.status(500).json({ error: "No image generated. Try again." });
-    }
-
-    let generatedImageBase64 = null;
-    let generatedMimeType = "image/png";
-
-    for (const part of candidates[0].content.parts) {
-      const d = part.inline_data || part.inlineData;
-      const mt = d?.mime_type || d?.mimeType;
-      if (d && mt?.startsWith("image/")) {
-        generatedImageBase64 = d.data;
-        generatedMimeType = mt;
-        break;
-      }
-    }
+    const openaiData = await openaiResponse.json();
+    const generatedImageBase64 = openaiData.data?.[0]?.b64_json;
 
     if (!generatedImageBase64) {
+      console.error("No image in OpenAI response:", JSON.stringify(openaiData).substring(0, 300));
       return res.status(500).json({ error: "No image in response. Try again." });
     }
 
     return res.status(200).json({
       success: true,
-      image: `data:${generatedMimeType};base64,${generatedImageBase64}`,
+      image: `data:image/png;base64,${generatedImageBase64}`,
       roastData,
       remaining: req._remaining ?? null,
     });
