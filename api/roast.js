@@ -249,21 +249,28 @@ BEFORE YOU OUTPUT: Read every joke. Is it actually funny or just a description w
     const sharp = (await import('sharp')).default;
 
     const imgBuffer = Buffer.from(image, 'base64');
-    const imgMeta = await sharp(imgBuffer).metadata();
-    const imgW = imgMeta.width;
-    const imgH = imgMeta.height;
 
-    // Square canvas sized to longer side × 1.8, so the photo occupies ~55% of the canvas.
-    const longer = Math.max(imgW, imgH);
-    const canvasSize = Math.round(longer * 1.8);
-    const left = Math.round((canvasSize - imgW) / 2);
-    const top = Math.round((canvasSize - imgH) / 2);
+    // Resize the source so its longer side fits ~55% of the final canvas.
+    // .rotate() with no args applies EXIF orientation so portrait phone shots
+    // don't get composited sideways. Resizing first (instead of compositing onto
+    // a giant canvas then scaling down) avoids Sharp's composite-larger-than-base
+    // error and keeps memory bounded on big mobile uploads.
+    const FINAL_CANVAS = 1024;
+    const PHOTO_TARGET = Math.round(FINAL_CANVAS / 1.8); // ~569px
+
+    const resizedBuffer = await sharp(imgBuffer)
+      .rotate()
+      .resize({ width: PHOTO_TARGET, height: PHOTO_TARGET, fit: 'inside' })
+      .toBuffer();
+    const resizedMeta = await sharp(resizedBuffer).metadata();
+
+    const left = Math.round((FINAL_CANVAS - resizedMeta.width) / 2);
+    const top = Math.round((FINAL_CANVAS - resizedMeta.height) / 2);
 
     const framedBuffer = await sharp({
-      create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+      create: { width: FINAL_CANVAS, height: FINAL_CANVAS, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
     })
-    .composite([{ input: imgBuffer, left, top }])
-    .resize(1024, 1024)
+    .composite([{ input: resizedBuffer, left, top }])
     .png()
     .toBuffer();
 
