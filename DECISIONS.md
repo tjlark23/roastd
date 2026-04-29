@@ -23,3 +23,7 @@
 ## 2026-03-09: Single HTML File Frontend
 **Decision:** Everything in one index.html file
 **Why:** Simple deployment, no build step, fast iteration. Can refactor to React/Next.js later if the project grows.
+
+## 2026-04-28: Migrated image generation from Gemini to OpenAI gpt-image-1
+**Decision:** Replaced Gemini Nano Banana 2 with OpenAI gpt-image-1 (`/v1/images/edits` endpoint) for the annotation step. Sharp pipeline still produces a square 1024x1024 white-framed canvas; OpenAI only paints the handwritten annotations on top.
+**Why:** Gemini consistently failed on layout, garbled handwriting, and unwanted watermarks despite ~6 prompt revisions. Manual ChatGPT testing showed gpt-image-1 produces dramatically better handwriting, zone placement, and instruction-following. Cost ~$0.18/roast at quality=high vs ~$0.10 with Gemini — still well inside the $0.50/roast ceiling and well under the $1/roast paid revenue.
