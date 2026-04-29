@@ -328,6 +328,7 @@ Make ALL text look like SLOPPY real handwriting. NOT neat. NOT professional. Thi
     formData.append('quality', openaiQuality);
     formData.append('n', '1');
     formData.append('output_format', 'png');
+    formData.append('moderation', 'low');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
