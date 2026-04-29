@@ -95,7 +95,7 @@ const STYLE_PROMPTS = {
 };
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 90,
 };
 
 export default async function handler(req, res) {
